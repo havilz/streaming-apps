@@ -6,11 +6,12 @@ Daftar ini digunakan untuk memantau progress pengerjaan aplikasi mobile. Setiap 
 
 ## Progress Global:
 - `[x]` Setup Lingkungan Awal (Flutter & Dependensi)
-- `[ ]` Setup Supabase (Database & Backend)
-- `[ ]` Implementasi Core & Sistem Desain
+- `[x]` Setup Supabase (Database & Backend)
+- `[x]` Implementasi Core & Sistem Desain
 - `[ ]` Implementasi Fitur Home (Daftar Konten)
 - `[ ]` Implementasi Fitur Detail & Player
 - `[ ]` Implementasi Fitur Pencarian & Filter
+- `[ ]` Implementasi Sync Otomatis (Edge Function + Cron)
 - `[ ]` Pengujian & Finalisasi
 
 ---
@@ -42,73 +43,44 @@ Daftar ini digunakan untuk memantau progress pengerjaan aplikasi mobile. Setiap 
 > **Catatan:** Bagian ini dikerjakan perlahan karena Supabase adalah platform BaaS (Backend-as-a-Service) yang baru. Setiap langkah akan dijelaskan secara rinci.
 
 #### 2a. Membuat Akun & Project Supabase
-- [ ] Daftar atau masuk ke [supabase.com](https://supabase.com)
-- [ ] Buat project baru (nama, password database, dan pilih region terdekat — pilih **Southeast Asia (Singapore)** untuk latensi terbaik)
-- [ ] Catat **Project URL** dan **Anon Public Key** dari menu **Settings > API**
-- [ ] Simpan kedua nilai tersebut ke file `.env`:
+- [x] Daftar atau masuk ke [supabase.com](https://supabase.com)
+- [x] Buat project baru (nama, password database, dan pilih region terdekat — pilih **Southeast Asia (Singapore)** untuk latensi terbaik)
+- [x] Catat **Project URL** dan **Anon Public Key** dari menu **Settings > API**
+- [x] Simpan kedua nilai tersebut ke file `.env`:
   ```
   SUPABASE_URL=https://xxxx.supabase.co
   SUPABASE_ANON_KEY=eyJxxxx...
   ```
 
 #### 2b. Membuat Skema Database di Supabase
-- [ ] Buka **Table Editor** atau **SQL Editor** di dashboard Supabase
-- [ ] Buat tabel `movies` dengan kolom berikut:
-  - `id` (int8, primary key, auto-increment)
-  - `slug` (text, unique, not null) — ID unik konten
-  - `title` (text, not null)
-  - `content_type` (text) — `'movie'` atau `'series'`
-  - `poster_url` (text) — URL gambar poster dari TMDB
-  - `backdrop_url` (text) — URL gambar backdrop
-  - `synopsis` (text)
-  - `genres` (jsonb) — array genre, contoh: `[{"name":"Action"}]`
-  - `release_date` (text) — format ISO date, contoh: `'2024-05-15'`
-  - `seasons` (jsonb, nullable) — daftar season untuk series
-  - `stream_url` (text, nullable) — URL stream yang sudah di-unlock
-  - `created_at` (timestamptz, default: `now()`)
-- [ ] Buat tabel `episodes` dengan kolom berikut:
-  - `id` (int8, primary key, auto-increment)
-  - `movie_id` (int8, foreign key ke `movies.id`)
-  - `season_number` (int4)
-  - `episode_number` (int4)
-  - `title` (text)
-  - `still_url` (text) — URL thumbnail episode
-  - `air_date` (text)
-  - `episode_id` (text) — ID episode dari sumber konten asli
-  - `stream_url` (text, nullable)
-  - `created_at` (timestamptz, default: `now()`)
-- [ ] Aktifkan **Row Level Security (RLS)** pada kedua tabel
-- [ ] Buat policy RLS yang mengizinkan `SELECT` untuk `anon` role (agar aplikasi bisa membaca data)
+- [x] Buka **Table Editor** atau **SQL Editor** di dashboard Supabase
+- [x] Buat tabel `movies` dengan kolom yang sesuai skema SQLite website
+- [x] Buat tabel `episodes` dengan kolom yang sesuai skema SQLite website
+- [x] Aktifkan **Row Level Security (RLS)** pada kedua tabel
+- [x] Buat policy RLS yang mengizinkan `SELECT` untuk `anon` role
 
 #### 2c. Migrasi Data dari SQLite Website
-- [ ] Ekspor data dari database SQLite website (`dev.db`) ke format CSV atau SQL
-- [ ] Import data ke tabel Supabase menggunakan fitur **Import CSV** di Table Editor atau via SQL Editor
-- [ ] Verifikasi jumlah baris setelah import sesuai dengan data di SQLite
+- [x] Buat script `migrate-to-supabase.js` di folder website
+- [x] Tambahkan `SUPABASE_SERVICE_KEY` ke `.env` website
+- [x] Jalankan script migrasi — hasil: **11.859 movies + 7.521 episodes** berhasil dimigrasikan
 
 #### 2d. Koneksi Supabase ke Flutter
-- [ ] Inisialisasi Supabase di `main.dart` sebelum `runApp()`:
-  ```dart
-  await dotenv.load(fileName: ".env");
-  await Supabase.initialize(
-    url: dotenv.env['SUPABASE_URL']!,
-    anonKey: dotenv.env['SUPABASE_ANON_KEY']!,
-  );
-  ```
-- [ ] Buat helper `core/network/supabase_client.dart` untuk mengekspos `Supabase.instance.client`
-- [ ] Uji koneksi dengan query sederhana (ambil 1 baris dari tabel `movies`) dan tampilkan hasilnya di console
+- [x] Inisialisasi Supabase di `main.dart` sebelum `runApp()`
+- [x] Buat helper `core/network/supabase_client.dart` untuk mengekspos `Supabase.instance.client`
+- [x] Uji koneksi dengan query sederhana (ambil 1 baris dari tabel `movies`) dan tampilkan hasilnya di console
 
 ---
 
 ### 3. Implementasi Core & Sistem Desain
-- [ ] Isi `core/constants/app_colors.dart` dengan semua token warna dari `design.md`
-- [ ] Isi `core/constants/app_typography.dart` dengan skala teks dan font family
-- [ ] Isi `core/constants/app_spacing.dart` dengan token spacing dan sizing
-- [ ] Isi `core/constants/app_radius.dart` dengan token border radius
-- [ ] Isi `core/constants/app_duration.dart` dengan token durasi animasi
-- [ ] Konfigurasi `ThemeData` dark di `core/theme/app_theme.dart` menggunakan semua konstanta di atas
-- [ ] Konfigurasi `GoRouter` di `core/router/app_router.dart` (route: home, detail, player, search)
-- [ ] Buat semua atom dasar: `AppText`, `AppBadge`, `AppShimmer`, `AppDivider`
-- [ ] Buat `MainScaffold` (template utama dengan `BottomNavigationBar` bergaya glassmorphism)
+- [x] Isi `core/constants/app_colors.dart` dengan semua token warna dari `design.md`
+- [x] Isi `core/constants/app_typography.dart` dengan skala teks dan font family
+- [x] Isi `core/constants/app_spacing.dart` dengan token spacing dan sizing
+- [x] Isi `core/constants/app_radius.dart` dengan token border radius
+- [x] Isi `core/constants/app_duration.dart` dengan token durasi animasi
+- [x] Konfigurasi `ThemeData` dark di `core/theme/app_theme.dart` menggunakan semua konstanta di atas
+- [x] Konfigurasi `GoRouter` di `core/router/app_router.dart` (route: home, detail, player, search)
+- [x] Buat semua atom dasar: `AppText`, `AppBadge`, `AppShimmer`, `AppDivider`
+- [x] Buat `MainScaffold` (template utama dengan `BottomNavigationBar` bergaya glassmorphism)
 
 ---
 
@@ -143,11 +115,29 @@ Daftar ini digunakan untuk memantau progress pengerjaan aplikasi mobile. Setiap 
 
 ---
 
-### 7. Pengujian & Finalisasi
+### 7. Implementasi Sync Otomatis (Edge Function + Cron)
+
+> Strategi: Primary = Supabase Cron otomatis harian. Fallback = trigger manual dari app jika cron gagal.
+
+- [ ] Buat Supabase Edge Function `sync-content` — logic scraping idlix ke Supabase (port dari `full-sync.js` website)
+  - Scrape daftar film & series dari homepage idlix
+  - Upsert data ke tabel `movies` dan `episodes` di Supabase
+  - Handle pagination untuk sync konten penuh
+- [ ] Aktifkan **Supabase Cron** — jadwalkan Edge Function berjalan otomatis setiap hari jam 00.00 WIB
+- [ ] Buat `sync_repository.dart` — fungsi trigger sync manual via HTTP call ke Edge Function
+- [ ] Buat `sync_provider.dart` — state loading/success/error saat sync berjalan
+- [ ] Implementasi **Pull-to-refresh** di `HomeScreen` — tarik layar ke bawah untuk trigger sync manual
+- [ ] Implementasi **tombol refresh** di AppBar `HomeScreen` sebagai alternatif trigger manual
+- [ ] Tampilkan snackbar/toast notifikasi hasil sync (berhasil / gagal / sudah up-to-date)
+
+---
+
+### 8. Pengujian & Finalisasi
 - [ ] Uji alur lengkap: buka app → browse konten → buka detail → putar video
 - [ ] Uji di beberapa ukuran layar (HP kecil, HP besar, tablet)
 - [ ] Uji filter Genre dan Tahun
 - [ ] Uji pencarian konten
+- [ ] Uji sync otomatis (cron) dan sync manual (pull-to-refresh + tombol)
 - [ ] Pastikan tidak ada `print()` tersisa di kode
 - [ ] Buat `walkthrough.md` yang mendokumentasikan seluruh proses dan checkpoint
 - [ ] Pastikan semua linting warning bersih
