@@ -90,9 +90,24 @@ Semua dokumen perancangan awal dibuat di folder `docs/`:
 ---
 
 ## Checkpoint 5 — Fitur Home
-**Status:** ⏳ Belum dimulai
+**Status:** ✅ Selesai
 
-*(Akan diisi setelah langkah ini selesai)*
+**Yang dikerjakan:**
+- `MovieModel` dibuat — mapping dari row Supabase ke Dart object
+- `HomeRepository` — query paginated dengan filter genre, tahun, dan content_type. Filter genre pakai `ilike` pada JSON string karena kolom disimpan sebagai TEXT bukan JSONB
+- `HomeFilterNotifier` + `HomeNotifier` — Riverpod `NotifierProvider` untuk state filter dan daftar konten
+- `HomeScreen` — `CustomScrollView` dengan `SliverAppBar` floating, tab Semua/Film/Series, `FilterBar`, grid konten, infinite scroll, pull-to-refresh, dan error view
+- `GoRouter` diupdate dengan `ShellRoute` untuk `MainScaffold` + route detail/player placeholder
+- `app.dart` direfactor — `ProviderScope` dipindah ke `App` widget, `MaterialApp.router` di `_AppView`
+
+**Keputusan teknis:**
+- Filter chaining Supabase harus dilakukan sebelum `.order().range()` — filter tidak bisa dichain setelah `PostgrestTransformBuilder`
+- `valueOrNull` tidak tersedia di Riverpod 3.x — diganti `.when(data:, error:, loading:)`
+- `MovieModel` tidak perlu export dari barrel features karena dipakai langsung di presentation layer fitur yang sama
+
+---
+
+## Checkpoint 6 — Fitur Detail & Player
 
 ---
 

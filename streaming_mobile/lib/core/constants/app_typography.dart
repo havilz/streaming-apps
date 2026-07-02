@@ -1,29 +1,28 @@
 import 'package:flutter/material.dart';
 
 /// Token tipografi: ukuran teks dan font family.
-/// Font Outfit (header) dan Inter (body) harus terdaftar di pubspec.yaml.
 abstract final class AppTypography {
   // --- Font Family ---
   static const String fontHeader = 'Outfit';
   static const String fontBody = 'Inter';
 
   // --- Skala Ukuran Teks (sp) ---
-  /// 11sp — label badge, caption kecil
+  /// 11sp
   static const double textXs = 11.0;
 
-  /// 13sp — meta info, keterangan sekunder
+  /// 13sp
   static const double textSm = 13.0;
 
-  /// 15sp — body teks, deskripsi sinopsis
+  /// 15sp
   static const double textMd = 15.0;
 
-  /// 18sp — sub-heading, judul card
+  /// 18sp
   static const double textLg = 18.0;
 
-  /// 22sp — heading section
+  /// 22sp
   static const double textXl = 22.0;
 
-  /// 28sp — judul halaman, nama film
+  /// 28sp
   static const double text2xl = 28.0;
 
   // --- Text Style Presets ---

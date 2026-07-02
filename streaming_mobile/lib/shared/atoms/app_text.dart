@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:streaming_mobile/core/core.dart';
 
 /// Widget teks dengan style bawaan dari sistem desain.
-/// Pilih [variant] yang sesuai daripada mendefinisikan style manual.
 enum AppTextVariant { heading, title, body, caption, badge, logo }
 
 class AppText extends StatelessWidget {

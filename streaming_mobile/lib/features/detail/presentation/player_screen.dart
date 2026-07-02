@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:streaming_mobile/core/core.dart';
 
-/// Halaman pemutar video — akan diimplementasi pada task 5.
 class PlayerScreen extends StatelessWidget {
   const PlayerScreen({super.key, required this.episodeId});
 

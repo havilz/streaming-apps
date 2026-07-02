@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Provider search query — akan diimplementasi penuh pada task 6.
-/// Menggunakan [NotifierProvider] untuk menyimpan dan mengupdate query teks.
+/// Provider untuk menyimpan dan mengupdate query pencarian.
 class SearchQueryNotifier extends Notifier<String> {
   @override
   String build() => '';

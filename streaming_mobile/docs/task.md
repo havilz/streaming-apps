@@ -85,13 +85,13 @@ Daftar ini digunakan untuk memantau progress pengerjaan aplikasi mobile. Setiap 
 ---
 
 ### 4. Implementasi Fitur Home (Daftar Konten)
-- [ ] Buat `home_repository.dart` — query paginated ke tabel `movies` (LIMIT 20, dengan parameter offset, genre, tahun)
-- [ ] Buat `home_provider.dart` — Riverpod `AsyncNotifier` yang memanggil repository dan mengelola state daftar konten + filter aktif
-- [ ] Buat `MovieCard` molecule — card poster film dengan efek glow saat ditekan
-- [ ] Buat `FilterBar` molecule — baris filter Genre dan Tahun
-- [ ] Buat `ContentGrid` organism — grid 2 kolom konten dengan shimmer loading
-- [ ] Buat `HomeScreen` — menggabungkan semua komponen di atas
-- [ ] Implementasi paginasi: muat lebih banyak konten saat scroll mendekati batas bawah
+- [x] Buat `home_repository.dart` — query paginated ke tabel `movies` (LIMIT 20, dengan parameter offset, genre, tahun)
+- [x] Buat `home_provider.dart` — Riverpod `AsyncNotifier` yang memanggil repository dan mengelola state daftar konten + filter aktif
+- [x] Buat `MovieCard` molecule — card poster film dengan efek glow saat ditekan
+- [x] Buat `FilterBar` molecule — baris filter Genre dan Tahun
+- [x] Buat `ContentGrid` organism — grid 2 kolom konten dengan shimmer loading
+- [x] Buat `HomeScreen` — menggabungkan semua komponen di atas
+- [x] Implementasi paginasi: muat lebih banyak konten saat scroll mendekati batas bawah
 
 ---
 

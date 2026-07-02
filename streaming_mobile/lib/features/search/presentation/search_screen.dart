@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:streaming_mobile/core/core.dart';
 
-/// Halaman pencarian — akan diimplementasi pada task 6.
 class SearchScreen extends StatelessWidget {
   const SearchScreen({super.key});
 

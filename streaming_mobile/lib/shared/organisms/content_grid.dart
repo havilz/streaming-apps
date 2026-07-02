@@ -4,9 +4,6 @@ import 'package:streaming_mobile/shared/atoms/atoms.dart';
 import 'package:streaming_mobile/shared/molecules/movie_card.dart';
 
 /// Grid konten film/series 2 kolom (mobile) atau 3 kolom (tablet).
-///
-/// Gunakan [items] untuk data sudah tersedia.
-/// Gunakan [isLoading] untuk menampilkan shimmer placeholder.
 class ContentGrid extends StatelessWidget {
   const ContentGrid({
     super.key,

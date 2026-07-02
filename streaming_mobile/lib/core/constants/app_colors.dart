@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 /// Semua token warna aplikasi.
-/// Selalu gunakan konstanta ini, jangan hardcode nilai hex langsung di widget.
 abstract final class AppColors {
   // --- Brand / Accent ---
   /// Warna aksen utama: merah gelap premium
@@ -23,7 +22,7 @@ abstract final class AppColors {
   /// Latar belakang card, bottom sheet, panel (elevated surface)
   static const Color surface = Color(0xFF111827);
 
-  /// Background navbar semi-transparan (gunakan dengan BackdropFilter)
+  /// Background navbar semi-transparan (dipakai bersama BackdropFilter)
   static const Color navbarBackground = Color(0xCC0B0F17);
 
   // --- Text ---

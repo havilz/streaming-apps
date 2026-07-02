@@ -1,5 +1,4 @@
 /// Konstanta nama tabel dan Edge Function di Supabase.
-/// Gunakan konstanta ini agar tidak ada typo nama tabel di query.
 abstract final class ApiEndpoints {
   // --- Tabel ---
   /// Tabel konten film dan series
