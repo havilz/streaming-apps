@@ -1,0 +1,31 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  errors:
+    # Treat missing return sebagai error
+    missing_return: error
+    # Dead code sebagai warning
+    dead_code: warning
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+
+linter:
+  rules:
+    # Wajib ada trailing comma untuk widget multi-line
+    require_trailing_commas: true
+    # Selalu gunakan const bila memungkinkan
+    prefer_const_constructors: true
+    prefer_const_declarations: true
+    prefer_const_literals_to_create_immutables: true
+    # Hindari print() di kode production
+    avoid_print: true
+    # Gunakan super parameters
+    use_super_parameters: true
+    # Sort imports
+    directives_ordering: true
+    # Hindari unnecessary null checks
+    avoid_unnecessary_containers: true
+    unnecessary_null_comparison: true
+    # Pastikan Semantics tersedia untuk aksesibilitas
+    use_decorated_box: true
