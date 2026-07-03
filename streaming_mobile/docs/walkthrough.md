@@ -124,13 +124,20 @@ Semua dokumen perancangan awal dibuat di folder `docs/`:
 ---
 
 ## Checkpoint 7 — Fitur Pencarian & Filter
+**Status:** ✅ Selesai
+
+**Yang dikerjakan:**
+- `SearchRepository` — query parallel ke tabel `movies` dan `series` pakai `ilike` pada `title`, hasil digabung dan diurutkan by `vote_average` descending
+- `SearchNotifier` — state `SearchState` dengan debounce 500ms, flag `hasSearched` untuk bedakan "belum pernah cari" vs "cari tapi kosong"
+- `SearchScreen` — search bar dengan autofocus, debounce, tombol clear, grid hasil 3 kolom, handling semua state (loading, error, empty, no-result)
+- Filter Genre & Tahun sudah aktif di home page via `genreId` integer dari tabel `genres` normalized
+
+**Catatan:**
+- Filter Negara dan Network belum aktif — data di tabel `countries`, `networks`, `movie_countries`, `series_countries`, `series_networks` masih kosong, akan diisi oleh Edge Function di step 7
 
 ---
 
-## Checkpoint 7 — Fitur Pencarian & Filter
-**Status:** ⏳ Belum dimulai
-
-*(Akan diisi setelah langkah ini selesai)*
+## Checkpoint 8 — Sync Otomatis (Edge Function + Cron)
 
 ---
 

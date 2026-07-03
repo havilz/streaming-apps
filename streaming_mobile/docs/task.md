@@ -10,7 +10,7 @@ Daftar ini digunakan untuk memantau progress pengerjaan aplikasi mobile. Setiap 
 - `[x]` Implementasi Core & Sistem Desain
 - `[x]` Implementasi Fitur Home (Daftar Konten)
 - `[x]` Implementasi Fitur Detail & Player
-- `[ ]` Implementasi Fitur Pencarian & Filter
+- `[x]` Implementasi Fitur Pencarian & Filter
 - `[ ]` Implementasi Sync Otomatis (Edge Function + Cron)
 - `[ ]` Pengujian & Finalisasi
 
@@ -108,11 +108,11 @@ Daftar ini digunakan untuk memantau progress pengerjaan aplikasi mobile. Setiap 
 ---
 
 ### 6. Implementasi Fitur Pencarian & Filter
-- [ ] Buat `search_repository.dart` — query `movies` dengan filter `title ILIKE '%query%'`
-- [ ] Buat `search_provider.dart` — state pencarian dengan debounce input
-- [ ] Buat `SearchScreen` — halaman pencarian dengan search bar dan hasil real-time
-- [ ] Integrasikan filter Genre, Tahun, **Negara, dan Network** dari `FilterBar` ke query di `home_provider.dart`
-  > Catatan: kolom `country` dan `networks` akan tersedia setelah enrich kedua (step pre-7) selesai
+- [x] Buat `search_repository.dart` — query `movies` dan `series` dengan filter `title ILIKE '%query%'`, hasil digabung dan diurutkan by rating
+- [x] Buat `search_provider.dart` — state pencarian dengan debounce 500ms
+- [x] Buat `SearchScreen` — halaman pencarian dengan search bar, debounce, dan hasil real-time
+- [x] Filter Genre & Tahun sudah terintegrasi di `home_provider.dart` via `genreId` dari tabel `genres`
+  > Catatan: filter Negara dan Network akan ditambahkan setelah data terisi di step 7
 
 ---
 
