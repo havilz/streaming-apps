@@ -12,7 +12,14 @@ class ContentGrid extends StatelessWidget {
     this.onItemTap,
   });
 
-  final List<({String title, String posterUrl, String slug})> items;
+  final List<({
+    String title,
+    String posterUrl,
+    String slug,
+    String? year,
+    double? voteAverage,
+    int? numberOfSeasons,
+  })> items;
   final bool isLoading;
   final void Function(String slug)? onItemTap;
 
@@ -39,6 +46,9 @@ class ContentGrid extends StatelessWidget {
         return MovieCard(
           title: item.title,
           posterUrl: item.posterUrl,
+          year: item.year,
+          voteAverage: item.voteAverage,
+          numberOfSeasons: item.numberOfSeasons,
           onTap: () => onItemTap?.call(item.slug),
         );
       },

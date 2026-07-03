@@ -11,12 +11,16 @@ class MovieCard extends StatefulWidget {
     required this.title,
     required this.posterUrl,
     this.year,
+    this.voteAverage,
+    this.numberOfSeasons,
     this.onTap,
   });
 
   final String title;
   final String posterUrl;
   final String? year;
+  final double? voteAverage;
+  final int? numberOfSeasons;
   final VoidCallback? onTap;
 
   @override
@@ -28,6 +32,8 @@ class _MovieCardState extends State<MovieCard> {
 
   @override
   Widget build(BuildContext context) {
+    final scale = _isPressed ? 0.97 : 1.0;
+
     return GestureDetector(
       onTapDown: (_) => setState(() => _isPressed = true),
       onTapUp: (_) => setState(() => _isPressed = false),
@@ -36,7 +42,7 @@ class _MovieCardState extends State<MovieCard> {
       child: AnimatedContainer(
         duration: AppDuration.normal,
         curve: AppDuration.defaultCurve,
-        transform: Matrix4.identity()..scale(_isPressed ? 0.97 : 1.0),
+        transform: Matrix4.diagonal3Values(scale, scale, 1.0),
         decoration: BoxDecoration(
           borderRadius: AppRadius.mdAll,
           boxShadow: _isPressed
@@ -74,7 +80,109 @@ class _MovieCardState extends State<MovieCard> {
                     ),
                   ),
                 ),
-                // Gradient overlay bawah
+
+                // Season count badge (Top-Right)
+                if (widget.numberOfSeasons != null && widget.numberOfSeasons! > 0)
+                  Positioned(
+                    top: 6,
+                    right: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.65),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.1),
+                          width: 0.8,
+                        ),
+                      ),
+                      child: Text(
+                        'S${widget.numberOfSeasons}',
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Bottom metadata badges (Rating & Year)
+                // We fade them out when card is pressed to avoid overlap with title
+                Positioned.fill(
+                  child: AnimatedOpacity(
+                    opacity: _isPressed ? 0.0 : 1.0,
+                    duration: AppDuration.fast,
+                    child: Stack(
+                      children: [
+                        // Rating (Bottom-Left)
+                        if (widget.voteAverage != null && widget.voteAverage! > 0.0)
+                          Positioned(
+                            bottom: 6,
+                            left: 6,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.65),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.1),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.star_rounded,
+                                    color: Colors.amber,
+                                    size: 10,
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    widget.voteAverage!.toStringAsFixed(1),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+
+                        // Year (Bottom-Right)
+                        if (widget.year != null && widget.year!.isNotEmpty)
+                          Positioned(
+                            bottom: 6,
+                            right: 6,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.65),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.1),
+                                  width: 0.8,
+                                ),
+                              ),
+                              child: Text(
+                                widget.year!,
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // Gradient overlay bawah (Title appears when pressed)
                 Positioned(
                   bottom: 0,
                   left: 0,

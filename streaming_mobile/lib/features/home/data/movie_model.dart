@@ -118,6 +118,7 @@ class SeriesModel {
     this.status,
     this.numberOfSeasons,
     this.genres = const [],
+    this.networks = const [],
   });
 
   final String id;
@@ -138,6 +139,7 @@ class SeriesModel {
 
   final int? numberOfSeasons;
   final List<String> genres;
+  final List<String> networks;
 
   bool get isOngoing => status == 'Returning Series';
   String get year => _yearFrom(firstAirDate);
@@ -151,6 +153,15 @@ class SeriesModel {
         final name =
             (sg['genres'] as Map<String, dynamic>?)?['name'] as String?;
         if (name != null) genreList.add(name);
+      }
+    }
+
+    final networkList = <String>[];
+    if (map['series_networks'] != null) {
+      for (final sn in map['series_networks'] as List) {
+        final name =
+            (sn['networks'] as Map<String, dynamic>?)?['name'] as String?;
+        if (name != null) networkList.add(name);
       }
     }
 
@@ -170,6 +181,7 @@ class SeriesModel {
       status: map['status'] as String?,
       numberOfSeasons: (map['number_of_seasons'] as num?)?.toInt(),
       genres: genreList,
+      networks: networkList,
     );
   }
 }
@@ -191,6 +203,10 @@ class ContentItem {
     this.voteAverage,
     this.quality,
     this.genres = const [],
+    this.backdropUrl,
+    this.overview,
+    this.numberOfSeasons,
+    this.networks = const [],
   });
 
   final String id;
@@ -202,6 +218,10 @@ class ContentItem {
   final double? voteAverage;
   final String? quality;
   final List<String> genres;
+  final String? backdropUrl;
+  final String? overview;
+  final int? numberOfSeasons;
+  final List<String> networks;
 
   factory ContentItem.fromMovie(MovieModel m) => ContentItem(
     id: m.id,
@@ -213,6 +233,10 @@ class ContentItem {
     voteAverage: m.voteAverage,
     quality: m.quality,
     genres: m.genres,
+    backdropUrl: m.backdropUrl,
+    overview: m.overview,
+    numberOfSeasons: null,
+    networks: const [],
   );
 
   factory ContentItem.fromSeries(SeriesModel s) => ContentItem(
@@ -225,5 +249,9 @@ class ContentItem {
     voteAverage: s.voteAverage,
     quality: s.quality,
     genres: s.genres,
+    backdropUrl: s.backdropUrl,
+    overview: s.overview,
+    numberOfSeasons: s.numberOfSeasons,
+    networks: s.networks,
   );
 }

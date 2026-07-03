@@ -51,35 +51,35 @@ class HomeFilterNotifier extends Notifier<HomeFilter> {
 
 class HomeState {
   const HomeState({
-    this.items = const [],
+    this.heroItems = const [],
+    this.trendingItems = const [],
+    this.genreItems = const {},
+    this.networkItems = const {},
     this.isLoading = false,
-    this.isLoadingMore = false,
-    this.hasMore = true,
     this.error,
-    this.currentPage = 0,
   });
 
-  final List<ContentItem> items;
+  final List<ContentItem> heroItems;
+  final List<ContentItem> trendingItems;
+  final Map<String, List<ContentItem>> genreItems;
+  final Map<String, List<ContentItem>> networkItems;
   final bool isLoading;
-  final bool isLoadingMore;
-  final bool hasMore;
   final String? error;
-  final int currentPage;
 
   HomeState copyWith({
-    List<ContentItem>? items,
+    List<ContentItem>? heroItems,
+    List<ContentItem>? trendingItems,
+    Map<String, List<ContentItem>>? genreItems,
+    Map<String, List<ContentItem>>? networkItems,
     bool? isLoading,
-    bool? isLoadingMore,
-    bool? hasMore,
     String? error,
-    int? currentPage,
   }) => HomeState(
-    items: items ?? this.items,
+    heroItems: heroItems ?? this.heroItems,
+    trendingItems: trendingItems ?? this.trendingItems,
+    genreItems: genreItems ?? this.genreItems,
+    networkItems: networkItems ?? this.networkItems,
     isLoading: isLoading ?? this.isLoading,
-    isLoadingMore: isLoadingMore ?? this.isLoadingMore,
-    hasMore: hasMore ?? this.hasMore,
     error: error,
-    currentPage: currentPage ?? this.currentPage,
   );
 }
 
@@ -89,97 +89,109 @@ final homeProvider = NotifierProvider<HomeNotifier, HomeState>(
 
 class HomeNotifier extends Notifier<HomeState> {
   HomeRepository get _repo => ref.read(homeRepositoryProvider);
-  HomeFilter get _filter => ref.read(homeFilterProvider);
 
   @override
   HomeState build() {
-    ref.listen(homeFilterProvider, (_, __) => reload());
     return const HomeState(isLoading: true);
   }
 
   Future<void> reload() async {
     state = const HomeState(isLoading: true);
     try {
-      final items = await _fetchPage(0);
+      // 1. Fetch latest items for Hero (unrestricted)
+      final heroMovies = await _repo.fetchMovies(page: 0, limit: 10);
+      final heroSeries = await _repo.fetchSeries(page: 0, limit: 10);
+      final heroCombined = [
+        ...heroMovies.map(ContentItem.fromMovie),
+        ...heroSeries.map(ContentItem.fromSeries),
+      ]..sort((a, b) => b.id.compareTo(a.id));
+      final heroItems = heroCombined.take(10).toList();
+
+      // 2. Fetch large batch of 2026 content for sections
+      final movies2026 = await _repo.fetchMovies(page: 0, year: '2026', limit: 100);
+      final series2026 = await _repo.fetchSeries(page: 0, year: '2026', limit: 100);
+      
+      final all2026 = [
+        ...movies2026.map(ContentItem.fromMovie),
+        ...series2026.map(ContentItem.fromSeries),
+      ];
+
+      // Filter: Year == 2026 AND voteAverage >= 7.0
+      final trending = all2026.where((item) {
+        final hasYear2026 = item.year == '2026';
+        final hasRating7 = item.voteAverage != null && item.voteAverage! >= 7.0;
+        return hasYear2026 && hasRating7;
+      }).toList();
+
+      // Sort trending items by rating or ID (descending)
+      trending.sort((a, b) {
+        final rA = a.voteAverage ?? 0.0;
+        final rB = b.voteAverage ?? 0.0;
+        if (rB != rA) return rB.compareTo(rA);
+        return b.id.compareTo(a.id);
+      });
+
+      // 3. Group by Genre
+      final genreMap = <String, List<ContentItem>>{};
+      for (final item in trending) {
+        for (final genre in item.genres) {
+          genreMap.putIfAbsent(genre, () => []).add(item);
+        }
+      }
+      final popularGenres = ['Action', 'Comedy', 'Drama', 'Adventure', 'Science Fiction', 'Animation', 'Thriller'];
+      final filteredGenreMap = <String, List<ContentItem>>{};
+      for (final g in popularGenres) {
+        final matchKey = genreMap.keys.firstWhere(
+          (key) => key.toLowerCase() == g.toLowerCase(),
+          orElse: () => '',
+        );
+        if (matchKey.isNotEmpty && genreMap[matchKey]!.isNotEmpty) {
+          filteredGenreMap[matchKey] = genreMap[matchKey]!;
+        }
+      }
+      if (filteredGenreMap.isEmpty) {
+        genreMap.forEach((key, value) {
+          if (value.isNotEmpty) filteredGenreMap[key] = value;
+        });
+      }
+
+      // 4. Fetch network series using dedicated method (no year restriction, rating >= 7.0)
+      final networkResults = await Future.wait([
+        _repo.fetchSeriesByNetwork('Netflix', minRating: 7.0, limit: 50),
+        // 'hbo' matches "HBO" and "HBO Max"; 'max' catches rebranded "Max"
+        _repo.fetchSeriesByNetwork('hbo', minRating: 7.0, limit: 50),
+        _repo.fetchSeriesByNetwork('Disney', minRating: 7.0, limit: 50),
+      ]);
+
+      // Merge HBO + Max results, deduplicate by id
+      final hboBase = <String, ContentItem>{};
+      for (final s in networkResults[1]) {
+        final item = ContentItem.fromSeries(s);
+        hboBase[item.id] = item;
+      }
+      // Also search for standalone 'Max' network (rebranded HBO Max)
+      final maxSeries = await _repo.fetchSeriesByNetwork('Max', minRating: 7.0, limit: 50);
+      for (final s in maxSeries) {
+        final item = ContentItem.fromSeries(s);
+        hboBase[item.id] = item;
+      }
+
+      final networkMap = <String, List<ContentItem>>{
+        'Netflix': networkResults[0].map(ContentItem.fromSeries).toList(),
+        'HBO': hboBase.values.toList()
+          ..sort((a, b) => (b.voteAverage ?? 0).compareTo(a.voteAverage ?? 0)),
+        'Disney+': networkResults[2].map(ContentItem.fromSeries).toList(),
+      };
+
       state = HomeState(
-        items: items,
+        heroItems: heroItems,
+        trendingItems: trending,
+        genreItems: filteredGenreMap,
+        networkItems: networkMap,
         isLoading: false,
-        hasMore: items.length >= 20,
-        currentPage: 0,
       );
     } catch (e) {
       state = HomeState(isLoading: false, error: e.toString());
-    }
-  }
-
-  Future<void> loadMore() async {
-    if (state.isLoadingMore || !state.hasMore) return;
-    state = state.copyWith(isLoadingMore: true);
-    try {
-      final nextPage = state.currentPage + 1;
-      final more = await _fetchPage(nextPage);
-
-      // Deduplicate
-      final seen = <String>{};
-      final merged = [
-        ...state.items,
-        ...more,
-      ].where((i) => seen.add(i.id)).toList();
-
-      state = state.copyWith(
-        items: merged,
-        isLoadingMore: false,
-        hasMore: more.length >= 20,
-        currentPage: nextPage,
-      );
-    } catch (e) {
-      state = state.copyWith(isLoadingMore: false, error: e.toString());
-    }
-  }
-
-  /// Fetch halaman sesuai tab aktif — movies, series, atau keduanya
-  Future<List<ContentItem>> _fetchPage(int page) async {
-    final f = _filter;
-
-    switch (f.tab) {
-      case ContentTab.movies:
-        final movies = await _repo.fetchMovies(
-          page: page,
-          genreId: f.genreId,
-          year: f.year,
-        );
-        return movies.map(ContentItem.fromMovie).toList();
-
-      case ContentTab.series:
-        final series = await _repo.fetchSeries(
-          page: page,
-          genreId: f.genreId,
-          year: f.year,
-        );
-        return series.map(ContentItem.fromSeries).toList();
-
-      case ContentTab.all:
-        // Ambil movies dan series secara parallel, lalu merge & sort
-        final results = await Future.wait([
-          _repo.fetchMovies(page: page, genreId: f.genreId, year: f.year),
-          _repo.fetchSeries(page: page, genreId: f.genreId, year: f.year),
-        ]);
-        final movies = (results[0] as List<MovieModel>)
-            .map(ContentItem.fromMovie)
-            .toList();
-        final series = (results[1] as List<SeriesModel>)
-            .map(ContentItem.fromSeries)
-            .toList();
-        // Interleave: 1 movie, 1 series, dst
-        final merged = <ContentItem>[];
-        final maxLen = movies.length > series.length
-            ? movies.length
-            : series.length;
-        for (int i = 0; i < maxLen; i++) {
-          if (i < movies.length) merged.add(movies[i]);
-          if (i < series.length) merged.add(series[i]);
-        }
-        return merged;
     }
   }
 }

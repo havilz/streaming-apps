@@ -138,6 +138,8 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           title: item.title,
           posterUrl: item.posterUrl ?? '',
           year: item.year,
+          voteAverage: item.voteAverage,
+          numberOfSeasons: item.numberOfSeasons,
           onTap: () => context.push(
             '/detail/${item.slug}',
             extra: {'isSeries': item.isSeries},

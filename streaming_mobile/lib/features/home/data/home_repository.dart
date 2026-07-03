@@ -12,11 +12,12 @@ class HomeRepository {
     int page = 0,
     int? genreId,
     String? year,
+    int? limit,
   }) async {
     var query = supabaseClient
         .from(ApiEndpoints.movies)
         .select(
-          'id, title, slug, poster_path, release_date, vote_average, quality, movie_genres(genres(name))',
+          'id, title, slug, poster_path, backdrop_path, overview, release_date, vote_average, quality, movie_genres(genres(name))',
         );
 
     if (year != null) {
@@ -26,9 +27,10 @@ class HomeRepository {
       query = query.eq('movie_genres.genre_id', genreId);
     }
 
+    final limitVal = limit ?? _pageSize;
     final data = await query
         .order('created_at', ascending: false)
-        .range(page * _pageSize, (page + 1) * _pageSize - 1);
+        .range(page * limitVal, (page + 1) * limitVal - 1);
 
     return (data as List).map((e) => MovieModel.fromMap(e)).toList();
   }
@@ -38,11 +40,12 @@ class HomeRepository {
     int page = 0,
     int? genreId,
     String? year,
+    int? limit,
   }) async {
     var query = supabaseClient
         .from(ApiEndpoints.series)
         .select(
-          'id, title, slug, poster_path, first_air_date, vote_average, quality, series_genres(genres(name))',
+          'id, title, slug, poster_path, backdrop_path, overview, first_air_date, vote_average, quality, series_genres(genres(name)), series_networks(networks(name))',
         );
 
     if (year != null) {
@@ -52,9 +55,10 @@ class HomeRepository {
       query = query.eq('series_genres.genre_id', genreId);
     }
 
+    final limitVal = limit ?? _pageSize;
     final data = await query
         .order('created_at', ascending: false)
-        .range(page * _pageSize, (page + 1) * _pageSize - 1);
+        .range(page * limitVal, (page + 1) * limitVal - 1);
 
     return (data as List).map((e) => SeriesModel.fromMap(e)).toList();
   }
@@ -96,5 +100,55 @@ class HomeRepository {
     }
 
     return yearSet.toList()..sort((a, b) => b.compareTo(a));
+  }
+
+  /// Ambil series berdasarkan nama network (partial match, case-insensitive).
+  /// Melakukan 3-step query: networks → series_networks → series.
+  Future<List<SeriesModel>> fetchSeriesByNetwork(
+    String networkPattern, {
+    double minRating = 0.0,
+    int limit = 50,
+  }) async {
+    // Step 1: cari network IDs yang namanya mengandung networkPattern
+    final networkRows = await supabaseClient
+        .from(ApiEndpoints.networks)
+        .select('id')
+        .ilike('name', '%$networkPattern%');
+
+    final networkIds =
+        (networkRows as List).map((n) => n['id'] as int).toList();
+    if (networkIds.isEmpty) return [];
+
+    // Step 2: ambil series_id dari junction table
+    final junctionRows = await supabaseClient
+        .from(ApiEndpoints.seriesNetworks)
+        .select('series_id')
+        .inFilter('network_id', networkIds);
+
+    final seriesIds = (junctionRows as List)
+        .map((n) => n['series_id'] as String)
+        .toSet()
+        .toList();
+    if (seriesIds.isEmpty) return [];
+
+    // Step 3: fetch series dengan rating filter, ordered by vote_average desc
+    var query = supabaseClient
+        .from(ApiEndpoints.series)
+        .select(
+          'id, title, slug, poster_path, backdrop_path, overview, '
+          'first_air_date, vote_average, quality, number_of_seasons, '
+          'series_genres(genres(name)), series_networks(networks(name))',
+        )
+        .inFilter('id', seriesIds);
+
+    if (minRating > 0) {
+      query = query.gte('vote_average', minRating);
+    }
+
+    final data = await query
+        .order('vote_average', ascending: false)
+        .limit(limit);
+
+    return (data as List).map((e) => SeriesModel.fromMap(e)).toList();
   }
 }
