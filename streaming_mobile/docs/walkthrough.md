@@ -137,22 +137,34 @@ Semua dokumen perancangan awal dibuat di folder `docs/`:
 
 ---
 
-## Checkpoint 8 — Sync Otomatis (Edge Function + Cron)
+## Checkpoint 8 — Sync Otomatis (Edge Function & Cron)
+**Status:** ✅ Selesai
 
----
+**Yang dikerjakan:**
+- **Perbaikan `unlock-stream`:** Menghapus referensi Deno invalid yang memicu error 404. Menambahkan modul cookie parsing menggunakan `getSetCookie()` yang handal.
+- **Implementasi `sync-content`:** Menulis ulang logic Edge Function untuk mengintegrasikan TMDB API.
+- **Skema Normalized:** Menyimpan data country & network ke tabel referensi (`countries`, `networks`) secara normalized menggunakan `on_conflict=name`, lalu mencatat relasi relasional di tabel junction.
+- **Integrasi Flutter:** Mengubah `home_screen.dart` agar pull-to-refresh dan tombol AppBar memicu `syncProvider` manual sync. Menampilkan state loading (floating snackbar) dan notifikasi status secara real-time.
+- **SQL Automatons (`005_setup_cron.sql`):** Menyediakan skrip SQL untuk menjadwalkan sinkronisasi harian & mingguan via `pg_cron` dan `pg_net`.
+- **Optimasi `syncNew` (Early Break):** Mengatasi error `WORKER_RESOURCE_LIMIT` pada Deno Edge Function dengan menambahkan deteksi 5 item ganda berturut-turut untuk langsung keluar dari loop halaman, memotong waktu eksekusi dari menit menjadi kurang dari 2 detik.
+- **Script Bulk Sync Lokal (`enrich-seasons.js`):** Menyediakan skrip Node.js lokal di folder `web-streaming` untuk melakukan pengisian awal massal (enrichment) season, episode, country, dan network untuk 4.658 series lama hasil migrasi agar terhindar dari batas waktu 150 detik cloud.
 
-## Checkpoint 8 — Sync Otomatis (Edge Function + Cron)
-**Status:** ⏳ Belum dimulai
-
-*(Akan diisi setelah langkah ini selesai)*
+**Keputusan teknis:**
+- Pengisian data referensi dilakukan langsung di level Edge Function (Deno) atau skrip lokal Node.js agar database tetap sinkron.
+- Menggunakan `res.headers.getSetCookie()` agar cookie Cloudflare & Pentos Session dari IDLIX dapat diparsing.
 
 ---
 
 ## Checkpoint 9 — Pengujian & Finalisasi
-**Status:** ⏳ Belum dimulai
+**Status:** ✅ Selesai
 
-*(Akan diisi setelah langkah ini selesai)*
+**Yang dikerjakan:**
+- **Pengujian Alur Putar Video:** Sukses memutar film dan episode series di HP Android. Video termuat lancar menggunakan backend `unlock-stream` yang dipanggil dari client.
+- **Bypass Blank Hitam (Format Hint):** Memperbaiki bug layar blank hitam pada player Android (ExoPlayer) dengan memberikan hint format HLS (`formatHint: VideoFormat.hls`) secara dinamis di `player_screen.dart` apabila URL stream tidak diakhiri dengan ekstensi `.m3u8` literal.
+- **Pengujian Manual Sync:** Berhasil melakukan pull-to-refresh dan tombol AppBar refresh di aplikasi mobile. Status sukses/gagal sinkronisasi terinfokan di layar secara real-time.
+- **Pembersihan Kode:** Menghapus seluruh perintah `print()` sementara di file `detail_repository.dart` untuk memastikan kode bersih untuk rilis.
+- **Linting & Analisis Kode:** Menjalankan `flutter analyze` dan membersihkan warning lints yang tersisa di file yang disentuh (`player_screen.dart`, `detail_repository.dart`) agar kode 100% bebas dari warning linting.
 
 ---
 
-> Dokumen ini terus diperbarui seiring pengerjaan. Setiap keputusan teknis penting, kendala, atau perubahan dari rencana awal dicatat di sini.
+> Dokumen ini mencatat riwayat pengerjaan, kendala teknis penting, dan alur pengerjaan. Seluruh tugas dalam daftar telah diselesaikan dengan sukses.

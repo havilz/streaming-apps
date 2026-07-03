@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:streaming_mobile/core/core.dart';
 import 'package:streaming_mobile/features/home/data/movie_model.dart';
-import 'package:streaming_mobile/features/home/domain/home_provider.dart';
+import 'package:streaming_mobile/features/home/domain/domain.dart';
 import 'package:streaming_mobile/shared/shared.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -48,13 +48,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final genres = ref.watch(availableGenresProvider);
     final years = ref.watch(availableYearsProvider);
 
+    ref.listen<SyncState>(syncProvider, (previous, next) {
+      if (next.status == SyncStatus.loading) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Mensinkronkan konten baru dari server...'),
+            duration: Duration(seconds: 30),
+          ),
+        );
+      } else if (next.status == SyncStatus.success) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sinkronisasi selesai! ${next.message}'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        ref.read(homeProvider.notifier).reload();
+      } else if (next.status == SyncStatus.error) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal sinkronisasi: ${next.message}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    });
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: RefreshIndicator(
           color: AppColors.primary,
           backgroundColor: AppColors.surface,
-          onRefresh: () => ref.read(homeProvider.notifier).reload(),
+          onRefresh: () => ref.read(syncProvider.notifier).sync(),
           child: CustomScrollView(
             controller: _scrollController,
             slivers: [
@@ -76,7 +105,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.refresh, color: AppColors.textMuted),
-                    onPressed: () => ref.read(homeProvider.notifier).reload(),
+                    onPressed: () => ref.read(syncProvider.notifier).sync(),
                   ),
                 ],
               ),

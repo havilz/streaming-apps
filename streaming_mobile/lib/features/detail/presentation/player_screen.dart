@@ -57,7 +57,15 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   }
 
   Future<void> _initPlayer(String url) async {
-    _videoController = VideoPlayerController.networkUrl(Uri.parse(url));
+    final uri = Uri.parse(url);
+    final isHls = uri.path.contains('.m3u8') ||
+        url.contains('m3u8') ||
+        !uri.path.endsWith('.mp4');
+
+    _videoController = VideoPlayerController.networkUrl(
+      uri,
+      formatHint: isHls ? VideoFormat.hls : null,
+    );
     await _videoController!.initialize();
 
     _chewieController = ChewieController(
@@ -100,7 +108,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                 child: Stack(
                   children: [
                     // Ambient glow merah
-                    Container(
+                    const DecoratedBox(
                       decoration: BoxDecoration(
                         boxShadow: [
                           BoxShadow(
@@ -207,7 +215,7 @@ class _CountdownOverlayState extends State<_CountdownOverlay>
           // Animasi glow
           AnimatedBuilder(
             animation: _pulse,
-            builder: (_, __) => Container(
+            builder: (_, child) => Container(
               width: 80,
               height: 80,
               decoration: BoxDecoration(
