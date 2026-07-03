@@ -1,32 +1,36 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:streaming_mobile/features/home/data/data.dart';
 
+// ── Repository ───────────────────────────────────────────────
+
 final homeRepositoryProvider = Provider<HomeRepository>(
   (_) => const HomeRepository(),
 );
 
+// ── Filter state ─────────────────────────────────────────────
+
+/// Tab konten: semua, movie saja, atau series saja
+enum ContentTab { all, movies, series }
+
 class HomeFilter {
-  const HomeFilter({this.genre, this.year, this.contentType});
+  const HomeFilter({this.genreId, this.year, this.tab = ContentTab.all});
 
-  final String? genre;
+  /// ID genre dari tabel `genres` (null = semua genre)
+  final int? genreId;
   final String? year;
-
-  /// null = semua, 'movie', atau 'series'
-  final String? contentType;
+  final ContentTab tab;
 
   HomeFilter copyWith({
-    Object? genre = _sentinel,
-    Object? year = _sentinel,
-    Object? contentType = _sentinel,
+    Object? genreId = _s,
+    Object? year = _s,
+    ContentTab? tab,
   }) => HomeFilter(
-    genre: genre == _sentinel ? this.genre : genre as String?,
-    year: year == _sentinel ? this.year : year as String?,
-    contentType: contentType == _sentinel
-        ? this.contentType
-        : contentType as String?,
+    genreId: genreId == _s ? this.genreId : genreId as int?,
+    year: year == _s ? this.year : year as String?,
+    tab: tab ?? this.tab,
   );
 
-  static const _sentinel = Object();
+  static const _s = Object();
 }
 
 final homeFilterProvider = NotifierProvider<HomeFilterNotifier, HomeFilter>(
@@ -37,16 +41,17 @@ class HomeFilterNotifier extends Notifier<HomeFilter> {
   @override
   HomeFilter build() => const HomeFilter();
 
-  void setGenre(String? genre) => state = state.copyWith(genre: genre);
+  void setGenre(int? id) => state = state.copyWith(genreId: id);
   void setYear(String? year) => state = state.copyWith(year: year);
-  void setContentType(String? type) =>
-      state = state.copyWith(contentType: type);
+  void setTab(ContentTab tab) => state = state.copyWith(tab: tab);
   void reset() => state = const HomeFilter();
 }
 
+// ── Home state ───────────────────────────────────────────────
+
 class HomeState {
   const HomeState({
-    this.movies = const [],
+    this.items = const [],
     this.isLoading = false,
     this.isLoadingMore = false,
     this.hasMore = true,
@@ -54,7 +59,7 @@ class HomeState {
     this.currentPage = 0,
   });
 
-  final List<MovieModel> movies;
+  final List<ContentItem> items;
   final bool isLoading;
   final bool isLoadingMore;
   final bool hasMore;
@@ -62,14 +67,14 @@ class HomeState {
   final int currentPage;
 
   HomeState copyWith({
-    List<MovieModel>? movies,
+    List<ContentItem>? items,
     bool? isLoading,
     bool? isLoadingMore,
     bool? hasMore,
     String? error,
     int? currentPage,
   }) => HomeState(
-    movies: movies ?? this.movies,
+    items: items ?? this.items,
     isLoading: isLoading ?? this.isLoading,
     isLoadingMore: isLoadingMore ?? this.isLoadingMore,
     hasMore: hasMore ?? this.hasMore,
@@ -88,25 +93,18 @@ class HomeNotifier extends Notifier<HomeState> {
 
   @override
   HomeState build() {
-    // Reload saat filter berubah
     ref.listen(homeFilterProvider, (_, __) => reload());
     return const HomeState(isLoading: true);
   }
 
-  /// Load halaman pertama (reset state)
   Future<void> reload() async {
     state = const HomeState(isLoading: true);
     try {
-      final movies = await _repo.fetchMovies(
-        page: 0,
-        genre: _filter.genre,
-        year: _filter.year,
-        contentType: _filter.contentType,
-      );
+      final items = await _fetchPage(0);
       state = HomeState(
-        movies: movies,
+        items: items,
         isLoading: false,
-        hasMore: movies.length >= 20,
+        hasMore: items.length >= 20,
         currentPage: 0,
       );
     } catch (e) {
@@ -114,20 +112,22 @@ class HomeNotifier extends Notifier<HomeState> {
     }
   }
 
-  /// Load halaman berikutnya (infinite scroll)
   Future<void> loadMore() async {
     if (state.isLoadingMore || !state.hasMore) return;
     state = state.copyWith(isLoadingMore: true);
     try {
       final nextPage = state.currentPage + 1;
-      final more = await _repo.fetchMovies(
-        page: nextPage,
-        genre: _filter.genre,
-        year: _filter.year,
-        contentType: _filter.contentType,
-      );
+      final more = await _fetchPage(nextPage);
+
+      // Deduplicate
+      final seen = <String>{};
+      final merged = [
+        ...state.items,
+        ...more,
+      ].where((i) => seen.add(i.id)).toList();
+
       state = state.copyWith(
-        movies: [...state.movies, ...more],
+        items: merged,
         isLoadingMore: false,
         hasMore: more.length >= 20,
         currentPage: nextPage,
@@ -136,9 +136,59 @@ class HomeNotifier extends Notifier<HomeState> {
       state = state.copyWith(isLoadingMore: false, error: e.toString());
     }
   }
+
+  /// Fetch halaman sesuai tab aktif — movies, series, atau keduanya
+  Future<List<ContentItem>> _fetchPage(int page) async {
+    final f = _filter;
+
+    switch (f.tab) {
+      case ContentTab.movies:
+        final movies = await _repo.fetchMovies(
+          page: page,
+          genreId: f.genreId,
+          year: f.year,
+        );
+        return movies.map(ContentItem.fromMovie).toList();
+
+      case ContentTab.series:
+        final series = await _repo.fetchSeries(
+          page: page,
+          genreId: f.genreId,
+          year: f.year,
+        );
+        return series.map(ContentItem.fromSeries).toList();
+
+      case ContentTab.all:
+        // Ambil movies dan series secara parallel, lalu merge & sort
+        final results = await Future.wait([
+          _repo.fetchMovies(page: page, genreId: f.genreId, year: f.year),
+          _repo.fetchSeries(page: page, genreId: f.genreId, year: f.year),
+        ]);
+        final movies = (results[0] as List<MovieModel>)
+            .map(ContentItem.fromMovie)
+            .toList();
+        final series = (results[1] as List<SeriesModel>)
+            .map(ContentItem.fromSeries)
+            .toList();
+        // Interleave: 1 movie, 1 series, dst
+        final merged = <ContentItem>[];
+        final maxLen = movies.length > series.length
+            ? movies.length
+            : series.length;
+        for (int i = 0; i < maxLen; i++) {
+          if (i < movies.length) merged.add(movies[i]);
+          if (i < series.length) merged.add(series[i]);
+        }
+        return merged;
+    }
+  }
 }
 
-final availableGenresProvider = FutureProvider<List<String>>((ref) async {
+// ── Filter options providers ─────────────────────────────────
+
+final availableGenresProvider = FutureProvider<List<({int id, String name})>>((
+  ref,
+) async {
   return ref.read(homeRepositoryProvider).fetchAvailableGenres();
 });
 

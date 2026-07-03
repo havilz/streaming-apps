@@ -1,29 +1,27 @@
-import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:streaming_mobile/features/detail/presentation/detail_screen.dart';
+import 'package:streaming_mobile/features/detail/presentation/player_screen.dart';
 import 'package:streaming_mobile/features/home/presentation/home_screen.dart';
 import 'package:streaming_mobile/features/search/presentation/search_screen.dart';
 import 'package:streaming_mobile/shared/templates/main_scaffold.dart';
 
-/// Konfigurasi routing aplikasi menggunakan GoRouter.
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
   debugLogDiagnostics: false,
   routes: [
-    // Shell route — halaman yang punya bottom navbar
+    // Halaman dengan bottom navbar
     ShellRoute(
       builder: (context, state, child) => MainScaffold(child: child),
       routes: [
         GoRoute(
           path: '/',
           name: 'home',
-          builder: (BuildContext context, GoRouterState state) =>
-              const HomeScreen(),
+          builder: (_, __) => const HomeScreen(),
         ),
         GoRoute(
           path: '/search',
           name: 'search',
-          builder: (BuildContext context, GoRouterState state) =>
-              const SearchScreen(),
+          builder: (_, __) => const SearchScreen(),
         ),
       ],
     ),
@@ -32,25 +30,24 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/detail/:slug',
       name: 'detail',
-      builder: (BuildContext context, GoRouterState state) {
+      builder: (context, state) {
         final slug = state.pathParameters['slug']!;
-        return Scaffold(
-          backgroundColor: const Color(0xFF0B0F17),
-          appBar: AppBar(title: Text(slug)),
-          body: Center(child: Text(slug)),
-        );
+        final extra = state.extra as Map<String, dynamic>? ?? {};
+        final isSeries = extra['isSeries'] as bool? ?? false;
+        return DetailScreen(slug: slug, isSeries: isSeries);
       },
     ),
 
     GoRoute(
       path: '/player/:episodeId',
       name: 'player',
-      builder: (BuildContext context, GoRouterState state) {
+      builder: (context, state) {
         final episodeId = state.pathParameters['episodeId']!;
-        return Scaffold(
-          backgroundColor: const Color(0xFF0B0F17),
-          appBar: AppBar(title: Text(episodeId)),
-          body: Center(child: Text(episodeId)),
+        final extra = state.extra as Map<String, dynamic>? ?? {};
+        return PlayerScreen(
+          episodeId: episodeId,
+          slug: extra['slug'] as String? ?? '',
+          isMovie: extra['isMovie'] as bool? ?? false,
         );
       },
     ),

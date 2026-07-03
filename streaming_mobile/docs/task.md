@@ -8,8 +8,8 @@ Daftar ini digunakan untuk memantau progress pengerjaan aplikasi mobile. Setiap 
 - `[x]` Setup Lingkungan Awal (Flutter & Dependensi)
 - `[x]` Setup Supabase (Database & Backend)
 - `[x]` Implementasi Core & Sistem Desain
-- `[ ]` Implementasi Fitur Home (Daftar Konten)
-- `[ ]` Implementasi Fitur Detail & Player
+- `[x]` Implementasi Fitur Home (Daftar Konten)
+- `[x]` Implementasi Fitur Detail & Player
 - `[ ]` Implementasi Fitur Pencarian & Filter
 - `[ ]` Implementasi Sync Otomatis (Edge Function + Cron)
 - `[ ]` Pengujian & Finalisasi
@@ -96,14 +96,14 @@ Daftar ini digunakan untuk memantau progress pengerjaan aplikasi mobile. Setiap 
 ---
 
 ### 5. Implementasi Fitur Detail & Player
-- [ ] Buat `detail_repository.dart` — query detail satu film + daftar episode dari Supabase
-- [ ] Buat `detail_provider.dart` — state detail konten + pilihan season aktif
-- [ ] Buat `EpisodeTile` molecule — item episode dengan thumbnail, judul, tanggal
-- [ ] Buat `SeasonSelector` molecule — tombol season horizontal scrollable
-- [ ] Buat `EpisodeList` organism — daftar episode lengkap
-- [ ] Buat `DetailScreen` — halaman detail film/series (backdrop, sinopsis, genre, daftar episode)
-- [ ] Buat `PlayerScreen` — pemutar video full-screen dengan loading countdown 15 detik dan efek ambient glow
-- [ ] Implementasi logika unlock stream: panggil Supabase Edge Function atau endpoint yang sama dengan website
+- [x] Buat `detail_repository.dart` — query detail satu film + daftar episode dari Supabase
+- [x] Buat `detail_provider.dart` — state detail konten + pilihan season aktif
+- [x] Buat `EpisodeTile` molecule — item episode dengan thumbnail, judul, tanggal
+- [x] Buat `SeasonSelector` molecule — tombol season horizontal scrollable
+- [x] Buat `EpisodeList` organism — daftar episode lengkap
+- [x] Buat `DetailScreen` — halaman detail film/series (backdrop, sinopsis, genre, daftar episode)
+- [x] Buat `PlayerScreen` — pemutar video full-screen dengan loading countdown 15 detik dan efek ambient glow
+- [x] Implementasi logika unlock stream: 3-step Pentos flow langsung ke idlix
 
 ---
 
@@ -111,33 +111,76 @@ Daftar ini digunakan untuk memantau progress pengerjaan aplikasi mobile. Setiap 
 - [ ] Buat `search_repository.dart` — query `movies` dengan filter `title ILIKE '%query%'`
 - [ ] Buat `search_provider.dart` — state pencarian dengan debounce input
 - [ ] Buat `SearchScreen` — halaman pencarian dengan search bar dan hasil real-time
-- [ ] Integrasikan filter Genre & Tahun dari `FilterBar` ke query di `home_provider.dart`
+- [ ] Integrasikan filter Genre, Tahun, **Negara, dan Network** dari `FilterBar` ke query di `home_provider.dart`
+  > Catatan: kolom `country` dan `networks` akan tersedia setelah enrich kedua (step pre-7) selesai
+
+---
+
+### 6.5 — Persiapan Database Sebelum Step 7 (one-time, dari komputer)
+
+> Dikerjakan dari website lokal, bukan dari Flutter app.
+
+- [ ] Tambah kolom baru ke tabel Supabase via SQL Editor:
+  ```sql
+  ALTER TABLE movies ADD COLUMN IF NOT EXISTS status TEXT;
+  ALTER TABLE movies ADD COLUMN IF NOT EXISTS country TEXT;
+  ALTER TABLE movies ADD COLUMN IF NOT EXISTS networks TEXT;
+  ```
+- [ ] Update `enrich-details.js` agar bisa enrich kolom `status`, `country`, `networks` dari TMDB
+  - Movie: `/movie/{tmdb_id}` → `status`, `production_countries`
+  - Series: `/tv/{tmdb_id}` → `status` (Returning Series / Ended), `networks`
+- [ ] Jalankan enrich kedua: `node enrich-details.js --mode extra`
+  - Filter: `WHERE status IS NULL` — tidak perlu ulang semua konten
+- [ ] Verifikasi: cek beberapa baris di Supabase, pastikan `status`, `country`, `networks` terisi
 
 ---
 
 ### 7. Implementasi Sync Otomatis (Edge Function + Cron)
 
-> Strategi: Primary = Supabase Cron otomatis harian. Fallback = trigger manual dari app jika cron gagal.
+> **Arsitektur:**
+> - idlix → sumber konten & stream URL
+> - TMDB → sumber metadata (overview, status, country, networks, dll)
+> - Keduanya disambungkan via `tmdb_id` yang ada di setiap konten idlix
 
-- [ ] Buat Supabase Edge Function `sync-content` — logic scraping idlix ke Supabase (port dari `full-sync.js` website)
-  - Scrape daftar film & series dari homepage idlix
-  - Upsert data ke tabel `movies` dan `episodes` di Supabase
-  - Handle pagination untuk sync konten penuh
-- [ ] Aktifkan **Supabase Cron** — jadwalkan Edge Function berjalan otomatis setiap hari jam 00.00 WIB
-- [ ] Buat `sync_repository.dart` — fungsi trigger sync manual via HTTP call ke Edge Function
+#### 7a. Supabase Edge Function `sync-content`
+- [ ] Buat Edge Function `sync-content` di Supabase Dashboard → Edge Functions
+- [ ] Logic utama (port dari `full-sync.js` website, ditulis dalam Deno/TypeScript):
+  - Scrape catalog baru dari idlix `/api/movies` dan `/api/series` (pagination)
+  - Untuk setiap konten **baru** (belum ada di Supabase):
+    - Fetch detail series dari idlix `/api/series/{slug}` → dapat `seasons`
+    - Fetch metadata dari TMDB `/movie/{tmdb_id}` atau `/tv/{tmdb_id}` → dapat `overview`, `status`, `country`, `networks`
+    - Upsert ke tabel `movies` dengan data lengkap dari awal
+  - Upsert episode baru ke tabel `episodes`
+- [ ] Tambahkan endpoint unlock stream di Edge Function yang sama atau terpisah (`unlock-stream`)
+  - Port logika `fetchPlayInfo` dari `lib/scraper.ts` website ke Deno
+  - Terima parameter: `episodeId`, `slug`, `isMovie`
+  - Return: `{ url, subtitles }` atau error
+
+#### 7b. Supabase Cron
+- [ ] **Cron Harian** (setiap hari jam 00.00 WIB / 17.00 UTC):
+  - Panggil `sync-content` dengan mode `new` — hanya sync konten baru
+- [ ] **Cron Mingguan** (setiap Senin jam 02.00 WIB / Minggu 19.00 UTC):
+  - Panggil `sync-content` dengan mode `ongoing` — update episode untuk series dengan `status = 'Returning Series'` saja
+  - Lebih efisien dari sync semua karena hanya proses series yang masih aktif
+
+#### 7c. Integrasi Flutter → Edge Function
+- [ ] Update `detail_repository.dart` — ganti HTTP request langsung ke idlix dengan panggilan ke Supabase Edge Function `unlock-stream`
+  - Ini fix permanen untuk masalah Cloudflare 403 di Android
+- [ ] Buat `sync_repository.dart` — trigger sync manual via HTTP call ke Edge Function `sync-content`
 - [ ] Buat `sync_provider.dart` — state loading/success/error saat sync berjalan
-- [ ] Implementasi **Pull-to-refresh** di `HomeScreen` — tarik layar ke bawah untuk trigger sync manual
-- [ ] Implementasi **tombol refresh** di AppBar `HomeScreen` sebagai alternatif trigger manual
-- [ ] Tampilkan snackbar/toast notifikasi hasil sync (berhasil / gagal / sudah up-to-date)
+- [ ] Implementasi **pull-to-refresh** di `HomeScreen` — trigger sync manual
+- [ ] Implementasi **tombol refresh** di AppBar sebagai alternatif
+- [ ] Tampilkan snackbar notifikasi hasil sync
 
 ---
 
 ### 8. Pengujian & Finalisasi
 - [ ] Uji alur lengkap: buka app → browse konten → buka detail → putar video
 - [ ] Uji di beberapa ukuran layar (HP kecil, HP besar, tablet)
-- [ ] Uji filter Genre dan Tahun
+- [ ] Uji filter Genre, Tahun, Negara, Network
 - [ ] Uji pencarian konten
 - [ ] Uji sync otomatis (cron) dan sync manual (pull-to-refresh + tombol)
+- [ ] Uji player: countdown unlock, video putar, landscape mode
 - [ ] Pastikan tidak ada `print()` tersisa di kode
 - [ ] Buat `walkthrough.md` yang mendokumentasikan seluruh proses dan checkpoint
 - [ ] Pastikan semua linting warning bersih

@@ -6,7 +6,6 @@ import 'package:streaming_mobile/features/home/data/movie_model.dart';
 import 'package:streaming_mobile/features/home/domain/home_provider.dart';
 import 'package:streaming_mobile/shared/shared.dart';
 
-/// Halaman utama — grid konten film & series dengan filter dan infinite scroll.
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -35,7 +34,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void _onScroll() {
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 300) {
-      ref.read(homeProvider.notifier).loadMore();
+      final state = ref.read(homeProvider);
+      if (!state.isLoadingMore && state.hasMore && !state.isLoading) {
+        ref.read(homeProvider.notifier).loadMore();
+      }
     }
   }
 
@@ -74,27 +76,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.refresh, color: AppColors.textMuted),
-                    tooltip: 'Refresh konten',
                     onPressed: () => ref.read(homeProvider.notifier).reload(),
                   ),
                 ],
               ),
 
+              // Tab: Semua / Film / Series
               SliverToBoxAdapter(
                 child: _ContentTypeTabs(
-                  selected: filter.contentType,
-                  onSelected: (type) => ref
-                      .read(homeFilterProvider.notifier)
-                      .setContentType(type),
+                  selected: filter.tab,
+                  onSelected: (tab) =>
+                      ref.read(homeFilterProvider.notifier).setTab(tab),
                 ),
               ),
 
+              // Filter bar genre & tahun
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
                   child: FilterBar(
                     genres: genres.when(
-                      data: (v) => v,
+                      data: (v) => v.map((g) => g.name).toList(),
                       error: (_, __) => [],
                       loading: () => [],
                     ),
@@ -103,17 +105,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       error: (_, __) => [],
                       loading: () => [],
                     ),
-                    selectedGenre: filter.genre,
+                    selectedGenre: genres.when(
+                      data: (v) => filter.genreId != null
+                          ? v
+                                .where((g) => g.id == filter.genreId)
+                                .firstOrNull
+                                ?.name
+                          : null,
+                      error: (_, __) => null,
+                      loading: () => null,
+                    ),
                     selectedYear: filter.year,
-                    onGenreChanged: (v) =>
-                        ref.read(homeFilterProvider.notifier).setGenre(v),
+                    onGenreChanged: (name) {
+                      if (name == null) {
+                        ref.read(homeFilterProvider.notifier).setGenre(null);
+                      } else {
+                        final id = genres.value
+                            ?.where((g) => g.name == name)
+                            .firstOrNull
+                            ?.id;
+                        ref.read(homeFilterProvider.notifier).setGenre(id);
+                      }
+                    },
                     onYearChanged: (v) =>
                         ref.read(homeFilterProvider.notifier).setYear(v),
                   ),
                 ),
               ),
 
-              if (homeState.error != null && homeState.movies.isEmpty)
+              if (homeState.error != null && homeState.items.isEmpty)
                 SliverFillRemaining(
                   child: _ErrorView(
                     message: homeState.error!,
@@ -121,11 +141,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 ),
 
-              if (!homeState.isLoading || homeState.movies.isNotEmpty)
+              if (!homeState.isLoading || homeState.items.isNotEmpty)
                 _ContentGridSliver(
-                  movies: homeState.movies,
+                  items: homeState.items,
                   isLoading: homeState.isLoading,
-                  onItemTap: (slug) => context.push('/detail/$slug'),
+                  onItemTap: (item) => context.push(
+                    '/detail/${item.slug}',
+                    extra: {'isSeries': item.isSeries},
+                  ),
                 ),
 
               if (homeState.isLoadingMore)
@@ -149,11 +172,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 }
 
+// ── Tab Semua / Film / Series ─────────────────────────────────
+
 class _ContentTypeTabs extends StatelessWidget {
   const _ContentTypeTabs({required this.selected, required this.onSelected});
 
-  final String? selected;
-  final void Function(String?) onSelected;
+  final ContentTab selected;
+  final void Function(ContentTab) onSelected;
 
   @override
   Widget build(BuildContext context) {
@@ -167,21 +192,21 @@ class _ContentTypeTabs extends StatelessWidget {
         children: [
           _Tab(
             label: 'Semua',
-            value: null,
+            value: ContentTab.all,
             selected: selected,
             onTap: onSelected,
           ),
           const SizedBox(width: AppSpacing.sm),
           _Tab(
             label: 'Film',
-            value: 'movie',
+            value: ContentTab.movies,
             selected: selected,
             onTap: onSelected,
           ),
           const SizedBox(width: AppSpacing.sm),
           _Tab(
             label: 'Series',
-            value: 'series',
+            value: ContentTab.series,
             selected: selected,
             onTap: onSelected,
           ),
@@ -200,37 +225,35 @@ class _Tab extends StatelessWidget {
   });
 
   final String label;
-  final String? value;
-  final String? selected;
-  final void Function(String?) onTap;
+  final ContentTab value;
+  final ContentTab selected;
+  final void Function(ContentTab) onTap;
 
   bool get _isActive => selected == value;
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedContainer(
-      duration: AppDuration.normal,
-      child: InkWell(
-        onTap: () => onTap(value),
-        borderRadius: AppRadius.fullAll,
-        child: Container(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.md,
-            vertical: AppSpacing.sm,
+    return InkWell(
+      onTap: () => onTap(value),
+      borderRadius: AppRadius.fullAll,
+      child: AnimatedContainer(
+        duration: AppDuration.normal,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md,
+          vertical: AppSpacing.sm,
+        ),
+        decoration: BoxDecoration(
+          color: _isActive ? AppColors.primary : AppColors.surface,
+          borderRadius: AppRadius.fullAll,
+          border: Border.all(
+            color: _isActive ? AppColors.primary : AppColors.borderSubtle,
           ),
-          decoration: BoxDecoration(
-            color: _isActive ? AppColors.primary : AppColors.surface,
-            borderRadius: AppRadius.fullAll,
-            border: Border.all(
-              color: _isActive ? AppColors.primary : AppColors.borderSubtle,
-            ),
-          ),
-          child: Text(
-            label,
-            style: AppTypography.caption.copyWith(
-              color: _isActive ? AppColors.textPrimary : AppColors.textMuted,
-              fontWeight: _isActive ? FontWeight.w600 : FontWeight.w400,
-            ),
+        ),
+        child: Text(
+          label,
+          style: AppTypography.caption.copyWith(
+            color: _isActive ? AppColors.textPrimary : AppColors.textMuted,
+            fontWeight: _isActive ? FontWeight.w600 : FontWeight.w400,
           ),
         ),
       ),
@@ -238,21 +261,22 @@ class _Tab extends StatelessWidget {
   }
 }
 
+// ── Grid konten ───────────────────────────────────────────────
+
 class _ContentGridSliver extends StatelessWidget {
   const _ContentGridSliver({
-    required this.movies,
+    required this.items,
     required this.isLoading,
     required this.onItemTap,
   });
 
-  final List<MovieModel> movies;
+  final List<ContentItem> items;
   final bool isLoading;
-  final void Function(String slug) onItemTap;
+  final void Function(ContentItem item) onItemTap;
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final crossAxisCount = width >= 600 ? 3 : 2;
+    final crossAxisCount = MediaQuery.sizeOf(context).width >= 600 ? 3 : 2;
 
     if (isLoading) {
       return SliverPadding(
@@ -275,7 +299,7 @@ class _ContentGridSliver extends StatelessWidget {
       );
     }
 
-    if (movies.isEmpty) {
+    if (items.isEmpty) {
       return const SliverFillRemaining(
         child: Center(
           child: AppText(
@@ -291,14 +315,14 @@ class _ContentGridSliver extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.md),
       sliver: SliverGrid(
         delegate: SliverChildBuilderDelegate((context, index) {
-          final movie = movies[index];
+          final item = items[index];
           return MovieCard(
-            title: movie.title,
-            posterUrl: movie.posterPath ?? '',
-            year: movie.year,
-            onTap: () => onItemTap(movie.slug),
+            title: item.title,
+            posterUrl: item.posterUrl ?? '',
+            year: item.year,
+            onTap: () => onItemTap(item),
           );
-        }, childCount: movies.length),
+        }, childCount: items.length),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: crossAxisCount,
           mainAxisSpacing: AppSpacing.sm,
@@ -309,6 +333,8 @@ class _ContentGridSliver extends StatelessWidget {
     );
   }
 }
+
+// ── Error view ────────────────────────────────────────────────
 
 class _ErrorView extends StatelessWidget {
   const _ErrorView({required this.message, required this.onRetry});

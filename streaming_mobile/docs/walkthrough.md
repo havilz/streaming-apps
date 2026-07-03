@@ -93,28 +93,37 @@ Semua dokumen perancangan awal dibuat di folder `docs/`:
 **Status:** ✅ Selesai
 
 **Yang dikerjakan:**
-- `MovieModel` dibuat — mapping dari row Supabase ke Dart object
-- `HomeRepository` — query paginated dengan filter genre, tahun, dan content_type. Filter genre pakai `ilike` pada JSON string karena kolom disimpan sebagai TEXT bukan JSONB
-- `HomeFilterNotifier` + `HomeNotifier` — Riverpod `NotifierProvider` untuk state filter dan daftar konten
-- `HomeScreen` — `CustomScrollView` dengan `SliverAppBar` floating, tab Semua/Film/Series, `FilterBar`, grid konten, infinite scroll, pull-to-refresh, dan error view
-- `GoRouter` diupdate dengan `ShellRoute` untuk `MainScaffold` + route detail/player placeholder
-- `app.dart` direfactor — `ProviderScope` dipindah ke `App` widget, `MaterialApp.router` di `_AppView`
+- Schema database di-rebuild total ke normalized schema — tabel terpisah: `movies`, `series`, `episodes`, `genres`, `countries`, `networks` + junction tables
+- `MovieModel` dan `SeriesModel` dibuat sebagai model terpisah, `ContentItem` sebagai unified model untuk home grid
+- `HomeRepository` — query dua tabel sekaligus dengan filter genre (via ID) dan tahun
+- `HomeFilterNotifier` — filter pakai `ContentTab` enum (Semua/Film/Series) dan `genreId` integer
+- `HomeScreen` — grid konten dengan tab, filter bar, infinite scroll, pull-to-refresh
+- Script `migrate-to-supabase.js` ditulis ulang dengan retry + resume — berhasil migrate **7.186 movies + 4.673 series + 335 episodes**
 
 **Keputusan teknis:**
-- Filter chaining Supabase harus dilakukan sebelum `.order().range()` — filter tidak bisa dichain setelah `PostgrestTransformBuilder`
-- `valueOrNull` tidak tersedia di Riverpod 3.x — diganti `.when(data:, error:, loading:)`
-- `MovieModel` tidak perlu export dari barrel features karena dipakai langsung di presentation layer fitur yang sama
+- `genre` filter berubah dari string ke `genreId` integer karena genre di tabel terpisah
+- `on_conflict` parameter wajib di URL Supabase REST untuk upsert normalized tables
+- Tab "Semua" fetch movies + series secara parallel lalu interleave hasilnya
 
 ---
 
 ## Checkpoint 6 — Fitur Detail & Player
+**Status:** ✅ Selesai
+
+**Yang dikerjakan:**
+- `MovieModel`/`SeriesModel` dipisah — `DetailScreen` sekarang punya `_MovieBody` dan `_SeriesBody` terpisah
+- `DetailRepository` — `fetchMovieDetail`, `fetchSeriesDetail`, `fetchEpisodes` (query tabel `series`), unlock stream 3-step Pentos flow
+- `EpisodeModel` — field `movieId` diganti `seriesId` sesuai schema baru
+- `PlayerScreen` — full-screen landscape, countdown overlay animasi pulse, ambient glow merah, Chewie player HLS
+- Router pass `isSeries` via `extra` ke `DetailScreen`
+
+**Keputusan teknis:**
+- Unlock stream langsung dari Flutter ke idlix → Cloudflare 403 di Android (akan difix di step 7 via Edge Function)
+- Provider cache manual untuk `streamProviderFor` dan `activeSeasonProviderFor` karena Riverpod 3.x family Notifier tidak support constructor parameter
 
 ---
 
-## Checkpoint 6 — Fitur Detail & Player
-**Status:** ⏳ Belum dimulai
-
-*(Akan diisi setelah langkah ini selesai)*
+## Checkpoint 7 — Fitur Pencarian & Filter
 
 ---
 
