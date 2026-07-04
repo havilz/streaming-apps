@@ -491,6 +491,11 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
         bufferedColor: AppColors.primaryGlow,
         backgroundColor: AppColors.surface,
       ),
+      routePageBuilder: (context, animation, secondaryAnimation, controllerProvider) {
+        return CustomChewieFullscreenPage(
+          controller: controllerProvider.controller,
+        );
+      },
     );
 
     if (mounted) setState(() {});
@@ -716,6 +721,95 @@ class _ErrorBody extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class CustomChewieFullscreenPage extends StatefulWidget {
+  const CustomChewieFullscreenPage({
+    super.key,
+    required this.controller,
+  });
+
+  final ChewieController controller;
+
+  @override
+  State<CustomChewieFullscreenPage> createState() =>
+      _CustomChewieFullscreenPageState();
+}
+
+class _CustomChewieFullscreenPageState
+    extends State<CustomChewieFullscreenPage> {
+  bool _isZoomFit = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final videoController = widget.controller.videoPlayerController;
+    final videoRatio = videoController.value.aspectRatio;
+    final screenRatio = MediaQuery.of(context).size.aspectRatio;
+    double scale = 1.0;
+    if (_isZoomFit && videoRatio > 0) {
+      if (screenRatio > videoRatio) {
+        scale = screenRatio / videoRatio;
+      } else {
+        scale = videoRatio / screenRatio;
+      }
+    }
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          Center(
+            child: SizedBox.expand(
+              child: Transform.scale(
+                scale: scale,
+                child: ChewieControllerProvider(
+                  controller: widget.controller,
+                  child: Chewie(controller: widget.controller),
+                ),
+              ),
+            ),
+          ),
+          // Buffer Indicator
+          ValueListenableBuilder(
+            valueListenable: videoController,
+            builder: (context, VideoPlayerValue value, child) {
+              if (value.isBuffering) {
+                return const Center(
+                  child: CircularProgressIndicator(
+                    color: AppColors.primary,
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
+          // Zoom Toggle Button
+          Positioned(
+            top: 30,
+            right: 50,
+            child: Material(
+              color: Colors.black54,
+              shape: const CircleBorder(),
+              child: IconButton(
+                iconSize: 28,
+                icon: Icon(
+                  _isZoomFit
+                      ? Icons.zoom_in_map_rounded
+                      : Icons.zoom_out_map_rounded,
+                  color: Colors.white,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _isZoomFit = !_isZoomFit;
+                  });
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -76,7 +76,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       videoPlayerController: _videoController!,
       autoPlay: true,
       looping: false,
-      allowFullScreen: true,
+      allowFullScreen: false, // Matikan fullscreen bawaan karena screen ini sudah landscape
       allowMuting: true,
       showControls: true,
       materialProgressColors: ChewieProgressColors(
@@ -174,6 +174,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                     setState(() {
                       _isZoomFit = !_isZoomFit;
                     });
+                  },
+                ),
+              ),
+            ),
+
+          // ── Back Button ──
+          if (_chewieController != null)
+            Positioned(
+              top: 30,
+              left: 50,
+              child: Material(
+                color: Colors.black54,
+                shape: const CircleBorder(),
+                child: IconButton(
+                  iconSize: 28,
+                  icon: const Icon(
+                    Icons.arrow_back_rounded,
+                    color: Colors.white,
+                  ),
+                  onPressed: () {
+                    context.pop();
                   },
                 ),
               ),
