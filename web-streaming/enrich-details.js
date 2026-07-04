@@ -161,7 +161,8 @@ async function fetchMovieDetailTmdb(tmdbId, slug) {
     const d = await res.json();
     return {
       tmdb_id:       resolvedId,
-      overview:      d.overview      || null,
+      // Gunakan placeholder jika TMDB tidak punya overview → cegah loop infinite
+      overview:      d.overview?.trim() || '[Sinopsis tidak tersedia di TMDB]',
       backdrop_path: d.backdrop_path || null,
       runtime:       d.runtime       || null,
       release_date:  d.release_date  || null,
