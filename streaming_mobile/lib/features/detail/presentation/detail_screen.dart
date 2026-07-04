@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:streaming_mobile/core/core.dart';
 import 'package:streaming_mobile/features/detail/domain/detail_provider.dart';
+import 'package:streaming_mobile/features/detail/presentation/episode_detail_screen.dart'
+    show EmbeddedPlayer;
 import 'package:streaming_mobile/features/home/data/movie_model.dart';
 import 'package:streaming_mobile/shared/shared.dart';
 
@@ -63,45 +65,53 @@ class DetailScreen extends ConsumerWidget {
 
 // ── Movie Body ────────────────────────────────────────────────
 
-class _MovieBody extends StatelessWidget {
+class _MovieBody extends StatefulWidget {
   const _MovieBody({required this.movie, required this.slug});
   final MovieModel movie;
   final String slug;
 
   @override
+  State<_MovieBody> createState() => _MovieBodyState();
+}
+
+class _MovieBodyState extends State<_MovieBody> {
+  bool _isPlaying = false;
+
+  @override
   Widget build(BuildContext context) {
     return CustomScrollView(
       slivers: [
-        _BackdropAppBar(backdropUrl: movie.backdropUrl),
+        _BackdropAppBar(
+          backdropUrl: widget.movie.backdropUrl,
+          isPlaying: _isPlaying,
+          movieId: widget.movie.id,
+          slug: widget.slug,
+          onPlay: () => setState(() => _isPlaying = true),
+        ),
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                AppText(movie.title, variant: AppTextVariant.heading),
+                AppText(widget.movie.title, variant: AppTextVariant.heading),
                 const SizedBox(height: AppSpacing.xs),
                 _MetaRow(
-                  year: movie.year,
-                  runtime: movie.runtime,
-                  voteAverage: movie.voteAverage,
-                  quality: movie.quality,
+                  year: widget.movie.year,
+                  runtime: widget.movie.runtime,
+                  voteAverage: widget.movie.voteAverage,
+                  quality: widget.movie.quality,
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                if (movie.genres.isNotEmpty) _GenreBadges(genres: movie.genres),
+                if (widget.movie.genres.isNotEmpty)
+                  _GenreBadges(genres: widget.movie.genres),
                 const SizedBox(height: AppSpacing.md),
-                _PlayButton(
-                  onTap: () => context.push(
-                    '/player/${movie.id}',
-                    extra: {'slug': slug, 'isMovie': true},
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                if (movie.overview != null && movie.overview!.isNotEmpty) ...[
+                if (widget.movie.overview != null &&
+                    widget.movie.overview!.isNotEmpty) ...[
                   const AppText('Sinopsis', variant: AppTextVariant.title),
                   const SizedBox(height: AppSpacing.xs),
                   AppText(
-                    movie.overview!,
+                    widget.movie.overview!,
                     variant: AppTextVariant.body,
                     color: AppColors.textMuted,
                   ),
@@ -284,13 +294,24 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
 // ── Shared widgets ────────────────────────────────────────────
 
 class _BackdropAppBar extends StatelessWidget {
-  const _BackdropAppBar({this.backdropUrl});
+  const _BackdropAppBar({
+    this.backdropUrl,
+    this.isPlaying = false,
+    this.movieId,
+    this.slug,
+    this.onPlay,
+  });
+
   final String? backdropUrl;
+  final bool isPlaying;
+  final String? movieId;
+  final String? slug;
+  final VoidCallback? onPlay;
 
   @override
   Widget build(BuildContext context) {
     return SliverAppBar(
-      expandedHeight: 250,
+      expandedHeight: 260,
       pinned: true,
       backgroundColor: AppColors.background,
       leading: IconButton(
@@ -298,25 +319,63 @@ class _BackdropAppBar extends StatelessWidget {
         onPressed: () => context.pop(),
       ),
       flexibleSpace: FlexibleSpaceBar(
-        background: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (backdropUrl != null)
-              CachedNetworkImage(imageUrl: backdropUrl!, fit: BoxFit.cover)
-            else
-              Container(color: AppColors.surface),
-            const DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, AppColors.background],
-                  stops: [0.4, 1.0],
-                ),
+        background: isPlaying && movieId != null && slug != null
+            // ── Mode Putar: ganti backdrop dengan embedded player ──
+            ? EmbeddedPlayer(
+                contentId: movieId!,
+                slug: slug!,
+                isMovie: true,
+              )
+            // ── Mode Normal: tampilkan backdrop + tombol play overlay ──
+            : Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (backdropUrl != null)
+                    CachedNetworkImage(
+                      imageUrl: backdropUrl!,
+                      fit: BoxFit.cover,
+                    )
+                  else
+                    Container(color: AppColors.surface),
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.transparent, AppColors.background],
+                        stops: [0.4, 1.0],
+                      ),
+                    ),
+                  ),
+                  // Tombol play di tengah backdrop
+                  if (onPlay != null)
+                    Center(
+                      child: GestureDetector(
+                        onTap: onPlay,
+                        child: Container(
+                          width: 64,
+                          height: 64,
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.9),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withValues(alpha: 0.5),
+                                blurRadius: 20,
+                                spreadRadius: 4,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.play_arrow_rounded,
+                            color: Colors.white,
+                            size: 36,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -367,6 +426,7 @@ class _GenreBadges extends StatelessWidget {
   }
 }
 
+// _PlayButton retained for potential future use in series body
 class _PlayButton extends StatelessWidget {
   const _PlayButton({required this.onTap});
   final VoidCallback onTap;

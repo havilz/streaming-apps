@@ -418,12 +418,24 @@ class _BackdropAppBar extends StatelessWidget {
 class EmbeddedPlayer extends ConsumerStatefulWidget {
   const EmbeddedPlayer({
     super.key,
-    required this.episodeId,
+    // Untuk episode (default):
+    this.episodeId,
+    // Untuk movie:
+    this.contentId,
+    this.isMovie = false,
     required this.slug,
-  });
+  }) : assert(
+          episodeId != null || contentId != null,
+          'Harus ada episodeId (series) atau contentId (movie)',
+        );
 
-  final String episodeId;
+  final String? episodeId;
+  final String? contentId;   // movie ID
+  final bool isMovie;
   final String slug;
+
+  /// ID yang digunakan sebagai key provider (episodeId untuk series, contentId untuk movie)
+  String get _providerId => isMovie ? contentId! : episodeId!;
 
   @override
   ConsumerState<EmbeddedPlayer> createState() => _EmbeddedPlayerState();
@@ -439,8 +451,8 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
     // Mulai unlock stream tanpa mengunci orientasi ke landscape
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref
-          .read(streamProviderFor(widget.episodeId).notifier)
-          .unlock(slug: widget.slug, isMovie: false);
+          .read(streamProviderFor(widget._providerId).notifier)
+          .unlock(slug: widget.slug, isMovie: widget.isMovie);
     });
   }
 
@@ -483,9 +495,9 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
 
   @override
   Widget build(BuildContext context) {
-    final streamState = ref.watch(streamProviderFor(widget.episodeId));
+    final streamState = ref.watch(streamProviderFor(widget._providerId));
 
-    ref.listen(streamProviderFor(widget.episodeId), (prev, next) {
+    ref.listen(streamProviderFor(widget._providerId), (prev, next) {
       if (next.hasResult && _videoController == null) {
         _initPlayer(next.result!.url);
       }
