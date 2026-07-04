@@ -40,6 +40,7 @@ class MovieModel {
     this.quality,
     this.status,
     this.genres = const [],
+    this.countries = const [],
   });
 
   final String id;
@@ -62,6 +63,9 @@ class MovieModel {
   /// Daftar nama genre (sudah diparsing dari relasi)
   final List<String> genres;
 
+  /// Daftar nama negara (sudah diparsing dari relasi)
+  final List<String> countries;
+
   String get year => _yearFrom(releaseDate);
   String? get posterUrl => _posterUrl(posterPath);
   String? get backdropUrl => _backdropUrl(backdropPath);
@@ -74,6 +78,15 @@ class MovieModel {
         final name =
             (mg['genres'] as Map<String, dynamic>?)?['name'] as String?;
         if (name != null) genreList.add(name);
+      }
+    }
+
+    final countryList = <String>[];
+    if (map['movie_countries'] != null) {
+      for (final mc in map['movie_countries'] as List) {
+        final name =
+            (mc['countries'] as Map<String, dynamic>?)?['name'] as String?;
+        if (name != null) countryList.add(name);
       }
     }
 
@@ -93,6 +106,7 @@ class MovieModel {
       quality: map['quality'] as String?,
       status: map['status'] as String?,
       genres: genreList,
+      countries: countryList,
     );
   }
 }
@@ -119,6 +133,7 @@ class SeriesModel {
     this.numberOfSeasons,
     this.genres = const [],
     this.networks = const [],
+    this.countries = const [],
   });
 
   final String id;
@@ -140,6 +155,7 @@ class SeriesModel {
   final int? numberOfSeasons;
   final List<String> genres;
   final List<String> networks;
+  final List<String> countries;
 
   bool get isOngoing => status == 'Returning Series';
   String get year => _yearFrom(firstAirDate);
@@ -165,6 +181,15 @@ class SeriesModel {
       }
     }
 
+    final countryList = <String>[];
+    if (map['series_countries'] != null) {
+      for (final sc in map['series_countries'] as List) {
+        final name =
+            (sc['countries'] as Map<String, dynamic>?)?['name'] as String?;
+        if (name != null) countryList.add(name);
+      }
+    }
+
     return SeriesModel(
       id: map['id'] as String,
       title: map['title'] as String,
@@ -182,6 +207,7 @@ class SeriesModel {
       numberOfSeasons: (map['number_of_seasons'] as num?)?.toInt(),
       genres: genreList,
       networks: networkList,
+      countries: countryList,
     );
   }
 }
@@ -207,6 +233,7 @@ class ContentItem {
     this.overview,
     this.numberOfSeasons,
     this.networks = const [],
+    this.countries = const [],
   });
 
   final String id;
@@ -222,6 +249,7 @@ class ContentItem {
   final String? overview;
   final int? numberOfSeasons;
   final List<String> networks;
+  final List<String> countries;
 
   factory ContentItem.fromMovie(MovieModel m) => ContentItem(
     id: m.id,
@@ -237,6 +265,7 @@ class ContentItem {
     overview: m.overview,
     numberOfSeasons: null,
     networks: const [],
+    countries: m.countries,
   );
 
   factory ContentItem.fromSeries(SeriesModel s) => ContentItem(
@@ -253,5 +282,6 @@ class ContentItem {
     overview: s.overview,
     numberOfSeasons: s.numberOfSeasons,
     networks: s.networks,
+    countries: s.countries,
   );
 }

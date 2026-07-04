@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:streaming_mobile/core/core.dart';
 import 'package:streaming_mobile/features/home/data/movie_model.dart';
 import 'package:streaming_mobile/features/home/domain/domain.dart';
+import 'package:streaming_mobile/features/home/presentation/menu_modal.dart';
+import 'package:streaming_mobile/features/search/presentation/search_modal.dart';
 import 'package:streaming_mobile/shared/shared.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -20,6 +22,67 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _showGlassBackground = false;
   String _trendingFilter = 'All';
   String _genreFilter = 'All';
+
+  final _trendingKey = GlobalKey();
+  final _genreKey = GlobalKey();
+  final _netflixKey = GlobalKey();
+
+  void _scrollToKey(GlobalKey key) {
+    final context = key.currentContext;
+    if (context != null) {
+      Scrollable.ensureVisible(
+        context,
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _handleMenuSelection(String item) {
+    switch (item) {
+      case 'home':
+        _scrollController.animateTo(
+          0.0,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+        );
+        break;
+      case 'movie':
+        setState(() => _trendingFilter = 'Movie');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToKey(_trendingKey);
+        });
+        break;
+      case 'series':
+        setState(() => _trendingFilter = 'Series');
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _scrollToKey(_trendingKey);
+        });
+        break;
+      case 'genres':
+        _scrollToKey(_genreKey);
+        break;
+      case 'network':
+        _scrollToKey(_netflixKey);
+        break;
+      case 'country':
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Fitur filter Negara akan segera hadir!'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        break;
+      case 'years':
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Fitur filter Tahun akan segera hadir!'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+        break;
+    }
+  }
 
   @override
   void initState() {
@@ -96,7 +159,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               controller: _scrollController,
               slivers: [
                 SliverToBoxAdapter(
-                  child: _HeroSection(
+                  child: HeroSection(
                     items: homeState.heroItems,
                     scrollController: _scrollController,
                   ),
@@ -124,41 +187,50 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 else ...[
                   // 1. Trending Now
                   SliverToBoxAdapter(
-                    child: _buildHorizontalLane(
-                      title: 'Trending Now',
-                      items: trendingFiltered,
-                      trailingHeader: _buildTrendingFilterRow(),
+                    child: Container(
+                      key: _trendingKey,
+                      child: _buildHorizontalLane(
+                        title: 'Trending Now',
+                        items: trendingFiltered,
+                        trailingHeader: _buildTrendingFilterRow(),
+                      ),
                     ),
                   ),
 
                   // 2. Best in Genre — All / Movie / Series filter
                   SliverToBoxAdapter(
-                    child: Builder(builder: (context) {
-                      final genreItems = _genreFilter == 'All'
-                          ? homeState.trendingItems
-                          : homeState.trendingItems
-                              .where((i) => _genreFilter == 'Movie'
-                                  ? !i.isSeries
-                                  : i.isSeries)
-                              .toList();
-                      return _buildHorizontalLane(
-                        title: 'Best in Genre',
-                        items: genreItems,
-                        trailingHeader: _buildDynamicFilterRow(
-                          options: ['All', 'Movie', 'Series'],
-                          active: _genreFilter,
-                          onTap: (v) => setState(() => _genreFilter = v),
-                        ),
-                      );
-                    }),
+                    child: Container(
+                      key: _genreKey,
+                      child: Builder(builder: (context) {
+                        final genreItems = _genreFilter == 'All'
+                            ? homeState.trendingItems
+                            : homeState.trendingItems
+                                .where((i) => _genreFilter == 'Movie'
+                                    ? !i.isSeries
+                                    : i.isSeries)
+                                .toList();
+                        return _buildHorizontalLane(
+                          title: 'Best in Genre',
+                          items: genreItems,
+                          trailingHeader: _buildDynamicFilterRow(
+                            options: ['All', 'Movie', 'Series'],
+                            active: _genreFilter,
+                            onTap: (v) => setState(() => _genreFilter = v),
+                          ),
+                        );
+                      }),
+                    ),
                   ),
 
                   // 3. Netflix section
                   SliverToBoxAdapter(
-                    child: _buildHorizontalLane(
-                      title: '🎬 Netflix',
-                      items: homeState.networkItems['Netflix'] ?? [],
-                      showWhenEmpty: true,
+                    child: Container(
+                      key: _netflixKey,
+                      child: _buildHorizontalLane(
+                        title: '🎬 Netflix',
+                        items: homeState.networkItems['Netflix'] ?? [],
+                        showWhenEmpty: true,
+                      ),
                     ),
                   ),
 
@@ -238,7 +310,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       color: AppColors.textPrimary,
                       size: 20,
                     ),
-                    onPressed: () => context.go('/search'),
+                    onPressed: () => showSearchModal(context),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  IconButton(
+                    constraints: const BoxConstraints(),
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(
+                      Icons.menu_rounded,
+                      color: AppColors.textPrimary,
+                      size: 22,
+                    ),
+                    onPressed: () => showMenuModal(
+                      context,
+                      onItemSelected: _handleMenuSelection,
+                    ),
                   ),
                 ],
               ),
@@ -469,8 +555,9 @@ class _ErrorView extends StatelessWidget {
 
 // ── Hero Section ──────────────────────────────────────────────
 
-class _HeroSection extends StatefulWidget {
-  const _HeroSection({
+class HeroSection extends StatefulWidget {
+  const HeroSection({
+    super.key,
     required this.items,
     required this.scrollController,
   });
@@ -479,10 +566,10 @@ class _HeroSection extends StatefulWidget {
   final ScrollController scrollController;
 
   @override
-  State<_HeroSection> createState() => _HeroSectionState();
+  State<HeroSection> createState() => _HeroSectionState();
 }
 
-class _HeroSectionState extends State<_HeroSection>
+class _HeroSectionState extends State<HeroSection>
     with SingleTickerProviderStateMixin {
   late PageController _pageController;
   late AnimationController _animationController;
@@ -510,7 +597,7 @@ class _HeroSectionState extends State<_HeroSection>
   }
 
   @override
-  void didUpdateWidget(covariant _HeroSection oldWidget) {
+  void didUpdateWidget(covariant HeroSection oldWidget) {
     super.didUpdateWidget(oldWidget);
     final oldCount = _getCount(oldWidget.items);
     final newCount = _getCount(widget.items);

@@ -12,6 +12,7 @@ Daftar ini digunakan untuk memantau progress pengerjaan aplikasi mobile. Setiap 
 - `[x]` Implementasi Fitur Detail & Player
 - `[x]` Implementasi Fitur Pencarian & Filter
 - `[x]` Implementasi Sync Otomatis (Edge Function + Cron)
+- `[x]` Restrukturisasi UI (Penghapusan Bottom Nav, Glass Search/Menu Modal, & Layar Kurasi Kategori)
 - `[x]` Pengujian & Finalisasi
 
 ---
@@ -181,3 +182,15 @@ Daftar ini digunakan untuk memantau progress pengerjaan aplikasi mobile. Setiap 
 - [x] Pastikan tidak ada `print()` tersisa di kode
 - [x] Buat `walkthrough.md` yang mendokumentasikan seluruh proses dan checkpoint
 - [x] Pastikan semua linting warning bersih
+
+---
+
+### 9. Restrukturisasi UI & Layar Kurasi Kategori
+- [x] Hapus `BottomNavigationBar` dari `MainScaffold` untuk menyajikan layout bioskop yang lebih bersih dan imersif
+- [x] Implementasikan modal overlay pencarian (`SearchModal`) bergaya glassmorphism dengan *live result* saat mengetik
+- [x] Implementasikan modal menu (`MenuModal`) dengan efek blur, shortcut navigasi lengkap, penanda aktif (`isActive`) berwarna merah, dan penyesuaian posisi tombol silang ("X")
+- [x] Buat layar `MovieScreen` dan `SeriesScreen` khusus yang memisahkan katalog film dan serial TV dengan layout premium ala beranda utama
+- [x] Bangun layar grid kategori: `GenresScreen` (kartu ikon genre), `CountriesScreen` (ikon globe), `YearsScreen` (ikon kalender), dan `NetworksScreen` (logo brand dinamis)
+- [x] Bangun layar detail dinamis: `GenreDetailScreen`, `CountryDetailScreen`, `YearDetailScreen`, dan `NetworkDetailScreen` lengkap dengan seksi *carousel*, filter interaktif, dan penanganan pemotongan teks judul (*ellipsis*) untuk mencegah *overflow* lebar
+- [x] Optimalkan metode `fetchAvailableYears` di `home_repository.dart` menggunakan kueri paralel batas atas (descending) & batas bawah (ascending) untuk menarik seluruh rentang tahun rilis dari database
+

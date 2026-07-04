@@ -1,2 +1,1 @@
-/// Barrel file untuk search presentation layer.
-export 'search_screen.dart';
+export 'search_modal.dart';
