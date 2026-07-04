@@ -122,7 +122,24 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         ],
                       ),
                     ),
-                    Chewie(controller: _chewieController!),
+                    InteractiveViewer(
+                      minScale: 1.0,
+                      maxScale: 4.0,
+                      child: Chewie(controller: _chewieController!),
+                    ),
+                    ValueListenableBuilder(
+                      valueListenable: _videoController!,
+                      builder: (context, VideoPlayerValue value, child) {
+                        if (value.isBuffering) {
+                          return const Center(
+                            child: CircularProgressIndicator(
+                              color: AppColors.primary,
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
                   ],
                 ),
               ),

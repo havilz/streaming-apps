@@ -508,7 +508,24 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
 
     if (_chewieController != null) {
       return Center(
-        child: Chewie(controller: _chewieController!),
+        child: Stack(
+          children: [
+            Chewie(controller: _chewieController!),
+            ValueListenableBuilder(
+              valueListenable: _videoController!,
+              builder: (context, VideoPlayerValue value, child) {
+                if (value.isBuffering) {
+                  return const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.primary,
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          ],
+        ),
       );
     }
 

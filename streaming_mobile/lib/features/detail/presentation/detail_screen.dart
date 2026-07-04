@@ -188,13 +188,7 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
                 if (widget.series.genres.isNotEmpty)
                   _GenreBadges(genres: widget.series.genres),
                 const SizedBox(height: AppSpacing.md),
-                _PlayButton(
-                  onTap: () => context.push(
-                    '/player/${widget.series.id}',
-                    extra: {'slug': widget.slug, 'isMovie': false},
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
+
                 if (widget.series.overview != null &&
                     widget.series.overview!.isNotEmpty) ...[
                   const AppText('Sinopsis', variant: AppTextVariant.title),
