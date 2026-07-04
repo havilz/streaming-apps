@@ -12,12 +12,19 @@ import 'package:streaming_mobile/features/home/presentation/years_screen.dart';
 import 'package:streaming_mobile/features/home/presentation/year_detail_screen.dart';
 import 'package:streaming_mobile/features/home/presentation/networks_screen.dart';
 import 'package:streaming_mobile/features/home/presentation/network_detail_screen.dart';
+import 'package:streaming_mobile/features/home/presentation/splash_screen.dart';
 import 'package:streaming_mobile/shared/templates/main_scaffold.dart';
 
 final GoRouter appRouter = GoRouter(
-  initialLocation: '/',
+  initialLocation: '/splash',
   debugLogDiagnostics: false,
   routes: [
+    // Splash Screen (di luar ShellRoute)
+    GoRoute(
+      path: '/splash',
+      name: 'splash',
+      builder: (_, __) => const SplashScreen(),
+    ),
     // Halaman utama
     ShellRoute(
       builder: (context, state, child) => MainScaffold(child: child),

@@ -193,4 +193,7 @@ Daftar ini digunakan untuk memantau progress pengerjaan aplikasi mobile. Setiap 
 - [x] Bangun layar grid kategori: `GenresScreen` (kartu ikon genre), `CountriesScreen` (ikon globe), `YearsScreen` (ikon kalender), dan `NetworksScreen` (logo brand dinamis)
 - [x] Bangun layar detail dinamis: `GenreDetailScreen`, `CountryDetailScreen`, `YearDetailScreen`, dan `NetworkDetailScreen` lengkap dengan seksi *carousel*, filter interaktif, dan penanganan pemotongan teks judul (*ellipsis*) untuk mencegah *overflow* lebar
 - [x] Optimalkan metode `fetchAvailableYears` di `home_repository.dart` menggunakan kueri paralel batas atas (descending) & batas bawah (ascending) untuk menarik seluruh rentang tahun rilis dari database
-
+- [x] Ganti nama user-facing aplikasi menjadi **Stream Vault** di platform Android & iOS
+- [x] Pasang dan konfigurasi `flutter_launcher_icons` dengan aset `assets/images/apps.icon.png` untuk memperbarui ikon aplikasi launcher secara otomatis
+- [x] Pasang dan konfigurasi paket `audioplayers` untuk pemutaran efek suara MP3 bioskop
+- [x] Implementasikan halaman `SplashScreen` dengan animasi logo "Sv" (scaling, opacity, letter spacing, glow shadow) terintegrasi dengan pemutaran efek suara MP3 bioskop selama 3.5 detik, lalu arahkan ke beranda utama

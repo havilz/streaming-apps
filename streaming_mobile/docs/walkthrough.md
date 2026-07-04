@@ -347,11 +347,18 @@ Semua dokumen perancangan awal dibuat di folder `docs/`:
   - Membuat `GenreDetailScreen`, `CountryDetailScreen`, `YearDetailScreen`, dan `NetworkDetailScreen` yang menampilkan banner atas dinamis serta jalur-jalur konten khusus (Trending, Best in Genre, Best in Country, dll.).
   - **Pencegahan Overflow Teks**: Membatasi judul seksi di dalam row menggunakan `Expanded` dan `TextOverflow.ellipsis` agar tidak terjadi *pixel overflow* pada nama kategori yang panjang (seperti United Kingdom atau Science Fiction).
 - **Optimalisasi Kueri Tahun**: Mengubah `fetchAvailableYears` di `home_repository.dart` untuk memanggil kueri paralel batas atas (descending) & batas bawah (ascending) agar seluruh tahun rilis di database tersaji secara dinamis.
+- **Rebranding Nama Aplikasi**: Mengubah nama aplikasi dari `streaming_mobile` menjadi **Stream Vault** di tingkat platform Android (`AndroidManifest.xml` -> `android:label`) dan iOS (`Info.plist` -> `CFBundleDisplayName` & `CFBundleName`).
+- **Generasi Ikon Launcher Aplikasi**: Mengintegrasikan paket `flutter_launcher_icons` dan mengonfigurasinya dengan gambar ikon pilihan Anda `assets/images/apps.icon.png`. Generasi aset ikon default Android (`ic_launcher`) dan iOS (`AppIcon`) telah berhasil dijalankan secara otomatis.
+- **Splash Screen Premium Ala Netflix**: Membuat halaman transisi pembuka (`SplashScreen`) dengan latar belakang hitam pekat dan animasi logo "Sv" berwarna merah menyala (`AppColors.primary`).
+  - **Animasi Logo**: Logo membesar perlahan (*scaling*), memudar masuk (*opacity*), dengan kerenggangan karakter (*letter spacing*) yang merapat sinematik dan efek cahaya pendar (*glow shadows*) yang melebar seiring jalannya waktu.
+  - **Efek Suara Bioskop**: Mengintegrasikan pustaka `audioplayers` untuk memutar efek suara intro bioskop dari berkas lokal Anda (`assets/sounds/Netflix intro - QuickSounds.com.mp3`) tepat saat aplikasi dibuka, menyelaraskan transisi audio dan visual selama 3,5 detik sebelum mengarah ke halaman beranda (`/`).
 
 **Keputusan teknis:**
 - Penggunaan `GoRouterState.of(context).uri.path` di level pemanggilan menu modal untuk mendeteksi rute aktif saat dialog/modal terbuka.
 - Pembatasan judul dengan `Expanded` dan `ellipsis` sebagai standar penanganan tata letak agar teks panjang terpotong secara bersih di semua ukuran layar.
 - Kueri parallel via `Future.wait` untuk mempercepat pemuatan tahun dinamis tanpa mengganggu performa responsivitas antarmuka.
+- Menggunakan `flutter_launcher_icons` dalam `dev_dependencies` untuk menghasilkan seluruh ukuran resolusi ikon aplikasi secara otomatis dan patuh terhadap standar build Play Store & App Store.
+- Memanfaatkan paket `audioplayers` menggunakan instansiasi `AssetSource` untuk pemutaran audio aset secara efisien dan andal pada platform seluler tanpa membebani memori (menggunakan `AudioPlayer.dispose()` saat keluar layar).
 
 ---
 

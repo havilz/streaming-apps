@@ -41,6 +41,7 @@ dependencies:
   flutter_dotenv: ^6.0.1
   video_player: ^2.11.1
   chewie: ^1.14.1
+  audioplayers: ^6.0.0
 
 dev_dependencies:
   flutter_test:
@@ -52,6 +53,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.13.1
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -64,6 +66,7 @@ flutter:
   assets:
     - .env
     - assets/images/
+    - assets/sounds/
 
   fonts:
     - family: Outfit
@@ -74,3 +77,8 @@ flutter:
         - asset: assets/fonts/Inter/Inter-VariableFont_opsz,wght.ttf
         - asset: assets/fonts/Inter/Inter-Italic-VariableFont_opsz,wght.ttf
           style: italic
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/apps.icon.png"

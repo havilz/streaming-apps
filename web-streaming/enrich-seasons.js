@@ -179,11 +179,25 @@ async function getOrCreateNetwork(name, logoPath) {
 async function main() {
   console.log('🚀 Memulai pengayaan (enrichment) series kosong di Supabase...');
 
-  // Ambil list series dari Supabase yang status atau seasons-nya masih kosong
-  const seriesToEnrich = await supabaseRequest(
-    'GET',
-    'series?select=id,slug,tmdb_id,number_of_seasons,status&or=(status.is.null,number_of_seasons.is.null)&limit=1000'
-  );
+  // Ambil list series dari Supabase menggunakan kueri paginasi paralel untuk mengantisipasi limit 1000 baris
+  console.log('   -> Mengunduh daftar series dari Supabase...');
+  const pages = await Promise.all([
+    supabaseRequest('GET', 'series?select=id,slug,tmdb_id,number_of_seasons,status,episodes(count)&limit=1000&offset=0'),
+    supabaseRequest('GET', 'series?select=id,slug,tmdb_id,number_of_seasons,status,episodes(count)&limit=1000&offset=1000'),
+    supabaseRequest('GET', 'series?select=id,slug,tmdb_id,number_of_seasons,status,episodes(count)&limit=1000&offset=2000'),
+    supabaseRequest('GET', 'series?select=id,slug,tmdb_id,number_of_seasons,status,episodes(count)&limit=1000&offset=3000'),
+    supabaseRequest('GET', 'series?select=id,slug,tmdb_id,number_of_seasons,status,episodes(count)&limit=1000&offset=4000'),
+    supabaseRequest('GET', 'series?select=id,slug,tmdb_id,number_of_seasons,status,episodes(count)&limit=1000&offset=5000'),
+  ]);
+
+  const allSeries = pages.flat().filter(Boolean);
+
+  // Filter series yang data seasons/status-nya null, ATAU yang jumlah episodenya masih 0
+  const seriesToEnrich = allSeries.filter(s => {
+    const isMetadataMissing = s.number_of_seasons == null || s.status == null;
+    const isEpisodesMissing = (s.episodes?.[0]?.count ?? 0) === 0;
+    return isMetadataMissing || isEpisodesMissing;
+  });
 
   console.log(`🔍 Ditemukan ${seriesToEnrich.length} series yang memerlukan pengayaan metadata/episode.`);
   if (seriesToEnrich.length === 0) {
