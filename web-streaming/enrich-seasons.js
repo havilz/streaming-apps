@@ -130,7 +130,7 @@ async function fetchEpisodes(slug, seasonNo) {
 async function fetchTmdbDetail(tmdbId) {
   if (!tmdbId) return null;
   try {
-    const res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}`, {
+    const res = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}?language=en-US`, {
       headers: {
         'Authorization': `Bearer ${TMDB_TOKEN}`,
         'Accept': 'application/json',
@@ -140,6 +140,37 @@ async function fetchTmdbDetail(tmdbId) {
     return await res.json();
   } catch {
     return null;
+  }
+}
+
+// Ambil daftar episode dari TMDB (fallback saat IDLIX diblokir)
+async function fetchTmdbSeasonEpisodes(tmdbId, seasonNumber) {
+  if (!tmdbId) return [];
+  try {
+    const res = await fetch(
+      `https://api.themoviedb.org/3/tv/${tmdbId}/season/${seasonNumber}?language=en-US`,
+      {
+        headers: {
+          'Authorization': `Bearer ${TMDB_TOKEN}`,
+          'Accept': 'application/json',
+        },
+      },
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (data.episodes ?? []).map(ep => ({
+      // TMDB tidak punya 'id' episode yang cocok dengan format IDLIX,
+      // buat id unik dari tmdb_id + season + episode
+      id: `tmdb-${tmdbId}-s${seasonNumber}e${ep.episode_number}`,
+      episodeNumber: ep.episode_number,
+      name: ep.name ?? null,
+      overview: ep.overview ?? null,
+      stillPath: ep.still_path ?? null,
+      runtime: ep.runtime ?? null,
+      airDate: ep.air_date ?? null,
+    }));
+  } catch {
+    return [];
   }
 }
 
@@ -218,12 +249,106 @@ async function main() {
     try {
       // 1. Fetch detail dari IDLIX
       const detail = await fetchSeriesDetail(series.slug);
+
+      // === FALLBACK TMDB: jika IDLIX diblokir/tidak ditemukan ===
       if (!detail) {
-        console.log(`   ⚠️ Detail IDLIX tidak ditemukan, dilewati.`);
-        failed++;
-        await sleep(300);
-        continue;
+        const tmdbId = series.tmdb_id;
+        if (!tmdbId) {
+          console.log(`   ⚠️ IDLIX tidak ditemukan, dan tidak ada tmdb_id → dilewati.`);
+          failed++;
+          await sleep(300);
+          continue;
+        }
+
+        console.log(`   ℹ️ IDLIX tidak ditemukan, fallback ke TMDB (id: ${tmdbId})...`);
+        const tmdbDetail = await fetchTmdbDetail(tmdbId);
+        if (!tmdbDetail) {
+          console.log(`   ⚠️ TMDB juga tidak ditemukan → dilewati.`);
+          failed++;
+          await sleep(300);
+          continue;
+        }
+
+        // Ambil genres, countries, networks dari TMDB
+        const tmdbGenres      = (tmdbDetail.genres ?? []).map(g => ({ name: g.name }));
+        const tmdbCountries   = (tmdbDetail.production_countries ?? []).map(c => ({
+          code: c.iso_3166_1, name: c.name,
+        }));
+        const tmdbNetworks    = (tmdbDetail.networks ?? []).map(n => ({
+          name: n.name, logoPath: n.logo_path ?? null,
+        }));
+        const totalSeasonsTmdb = tmdbDetail.number_of_seasons ?? null;
+        const statusTmdb       = tmdbDetail.status ?? null;
+        const overviewTmdb     = tmdbDetail.overview?.trim() || '[Sinopsis tidak tersedia]';
+
+        // Simpan references
+        const tmdbCountryIds = [];
+        for (const c of tmdbCountries) {
+          const cId = await getOrCreateCountry(c.code, c.name);
+          if (cId) tmdbCountryIds.push(cId);
+        }
+        const tmdbNetworkIds = [];
+        for (const n of tmdbNetworks) {
+          const nId = await getOrCreateNetwork(n.name, n.logoPath);
+          if (nId) tmdbNetworkIds.push(nId);
+        }
+
+        // Update series utama
+        await supabaseRequest('PATCH', `series?id=eq.${series.id}`, {
+          tmdb_id: tmdbId,
+          status: statusTmdb,
+          overview: overviewTmdb,
+          number_of_seasons: totalSeasonsTmdb,
+        });
+
+        for (const cId of tmdbCountryIds) {
+          await supabaseRequest('POST', 'series_countries?on_conflict=series_id,country_id', {
+            series_id: series.id, country_id: cId,
+          });
+        }
+        for (const nId of tmdbNetworkIds) {
+          await supabaseRequest('POST', 'series_networks?on_conflict=series_id,network_id', {
+            series_id: series.id, network_id: nId,
+          });
+        }
+        for (const g of tmdbGenres) {
+          const genreId = await getOrCreateGenre(g.name);
+          if (genreId) {
+            await supabaseRequest('POST', 'series_genres?on_conflict=series_id,genre_id', {
+              series_id: series.id, genre_id: genreId,
+            });
+          }
+        }
+
+        // Ambil episode dari TMDB per season
+        if (totalSeasonsTmdb && totalSeasonsTmdb > 0) {
+          console.log(`   -> Mengambil episode dari TMDB untuk ${totalSeasonsTmdb} season...`);
+          for (let sNo = 1; sNo <= totalSeasonsTmdb; sNo++) {
+            const eps = await fetchTmdbSeasonEpisodes(tmdbId, sNo);
+            console.log(`      * Season ${sNo}: ${eps.length} episode ditemukan (via TMDB).`);
+            for (const ep of eps) {
+              await supabaseRequest('POST', 'episodes?on_conflict=id', {
+                id: ep.id,
+                series_id: series.id,
+                season_number: sNo,
+                episode_number: ep.episodeNumber,
+                title: ep.name ?? null,
+                overview: ep.overview ?? null,
+                still_path: ep.stillPath ?? null,
+                runtime: ep.runtime ?? null,
+                air_date: ep.airDate ?? null,
+              });
+            }
+            await sleep(200);
+          }
+        }
+
+        success++;
+        console.log(`   ✅ [TMDB fallback] Selesai memperbarui series ${series.slug}`);
+        await sleep(400);
+        continue; // lanjut ke series berikutnya
       }
+      // ===================================================
 
       const tmdbId = detail.tmdbId ?? series.tmdb_id ?? null;
       let overview = detail.overview ?? null;
