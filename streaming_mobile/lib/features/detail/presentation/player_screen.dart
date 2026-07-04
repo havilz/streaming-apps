@@ -28,6 +28,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   VideoPlayerController? _videoController;
   ChewieController? _chewieController;
+  bool _isZoomFit = false;
 
   @override
   void initState() {
@@ -100,6 +101,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       }
     });
 
+    final videoRatio = _videoController?.value.aspectRatio ?? (16 / 9);
+    final screenRatio = MediaQuery.of(context).size.aspectRatio;
+    double scale = 1.0;
+    if (_isZoomFit && videoRatio > 0) {
+      if (screenRatio > videoRatio) {
+        scale = screenRatio / videoRatio;
+      } else {
+        scale = videoRatio / screenRatio;
+      }
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
@@ -122,9 +134,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         ],
                       ),
                     ),
-                    InteractiveViewer(
-                      minScale: 1.0,
-                      maxScale: 4.0,
+                    Transform.scale(
+                      scale: scale,
                       child: Chewie(controller: _chewieController!),
                     ),
                     ValueListenableBuilder(
@@ -141,6 +152,27 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       },
                     ),
                   ],
+                ),
+              ),
+            ),
+          
+          // ── Zoom Toggle Button ──
+          if (_chewieController != null)
+            Positioned(
+              top: AppSpacing.md,
+              right: AppSpacing.md,
+              child: SafeArea(
+                child: IconButton(
+                  icon: Icon(
+                    _isZoomFit ? Icons.zoom_in_map_rounded : Icons.zoom_out_map_rounded,
+                    color: Colors.white,
+                    shadows: const [Shadow(color: Colors.black, blurRadius: 4)],
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _isZoomFit = !_isZoomFit;
+                    });
+                  },
                 ),
               ),
             ),
