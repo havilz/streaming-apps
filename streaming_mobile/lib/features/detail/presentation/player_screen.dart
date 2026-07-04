@@ -84,6 +84,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         bufferedColor: AppColors.primaryGlow,
         backgroundColor: AppColors.surface,
       ),
+      zoomAndPan: true, // Coba aktifkan fitur zoom bawaan chewie jika ada
     );
 
     if (mounted) setState(() {});
@@ -106,8 +107,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           // ── Video Player ──
           if (_chewieController != null)
             Center(
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
+              child: SizedBox.expand(
                 child: Stack(
                   children: [
                     // Ambient glow merah
