@@ -39,6 +39,12 @@ if (existsSync(envPath)) {
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY;
 
+// --- Konfigurasi Notifikasi via ntfy.sh (opsional, GRATIS, 0 signup) ---
+// 1. Install app 'ntfy' di HP (Play Store / App Store)
+// 2. Subscribe ke topic unik Anda di app ntfy
+// 3. Isi NTFY_TOPIC di Railway Variables dengan nama topic yang sama
+const NTFY_TOPIC = process.env.NTFY_TOPIC ?? '';  // contoh: 'streamvault-namaku-2024'
+
 if (!SUPABASE_URL || !SUPABASE_KEY) {
   console.error('❌ SUPABASE_URL dan SUPABASE_SERVICE_KEY wajib diisi sebagai environment variable.');
   process.exit(1);
@@ -82,6 +88,26 @@ async function getCountRemaining() {
 }
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+// --- Kirim notifikasi push via ntfy.sh ---
+async function sendNotification(title, message, isError = false) {
+  if (!NTFY_TOPIC) return; // Lewati jika tidak dikonfigurasi
+  try {
+    await fetch(`https://ntfy.sh/${NTFY_TOPIC}`, {
+      method: 'POST',
+      headers: {
+        'Title':    title,
+        'Priority': isError ? 'urgent' : 'default',
+        'Tags':     isError ? 'x,rotating_light' : 'white_check_mark,clapper',
+        'Content-Type': 'text/plain',
+      },
+      body: message,
+    });
+    console.log('🔔 Notifikasi push berhasil dikirim!');
+  } catch (err) {
+    console.warn(`⚠️  Gagal kirim notifikasi: ${err.message}`);
+  }
+}
 
 // --- Format waktu ---
 function now() {
@@ -257,6 +283,11 @@ async function runWorker() {
   // SELESAI
   // ==========================================
   const elapsed = Date.now() - startTime;
+  const summary = `✅ *Stream Vault — Pengisian Data Selesai!*\n\n` +
+    `Semua metadata film dan episode series telah berhasil diisi ke Supabase.\n\n` +
+    `⏱ Total waktu: ${formatDuration(elapsed)}\n` +
+    `🕐 Selesai: ${now()}`;
+
   console.log('');
   console.log('╔══════════════════════════════════════════════════════╗');
   console.log('║            ✅ PENGISIAN DATA SELESAI!                 ║');
@@ -264,10 +295,20 @@ async function runWorker() {
   console.log(`   Total waktu berjalan: ${formatDuration(elapsed)}`);
   console.log(`   Selesai pada: ${now()}`);
   console.log('');
+
+  await sendNotification(
+    '✅ Stream Vault — Selesai!',
+    `Semua data berhasil diisi!\nTotal waktu: ${formatDuration(elapsed)}\nSelesai: ${now()}`
+  );
   process.exit(0);
 }
 
-runWorker().catch(err => {
+runWorker().catch(async err => {
   console.error('\n❌ FATAL:', err.message);
+  await sendNotification(
+    '❌ Stream Vault — Error!',
+    `Terjadi error fatal:\n${err.message}\n\nCek log Railway untuk detail.`,
+    true
+  );
   process.exit(1);
 });
