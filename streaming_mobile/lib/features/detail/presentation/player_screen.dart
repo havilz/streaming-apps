@@ -8,6 +8,30 @@ import 'package:streaming_mobile/shared/atoms/app_text.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'dart:async';
+
+class MutableChewieController extends ChewieController {
+  MutableChewieController({
+    required super.videoPlayerController,
+    super.aspectRatio,
+    super.autoPlay,
+    super.looping,
+    super.allowFullScreen,
+    super.allowMuting,
+    super.showControls,
+    super.materialProgressColors,
+    super.routePageBuilder,
+  });
+
+  double? _customAspectRatio;
+
+  @override
+  double? get aspectRatio => _customAspectRatio ?? super.aspectRatio;
+
+  set customAspectRatio(double? val) {
+    _customAspectRatio = val;
+  }
+}
 
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({
@@ -29,10 +53,31 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   VideoPlayerController? _videoController;
   ChewieController? _chewieController;
   bool _isZoomFit = false;
+  bool _areControlsVisible = true;
+  Timer? _controlsTimer;
+
+  void _onUserInteraction() {
+    if (!mounted) return;
+    setState(() {
+      _areControlsVisible = true;
+    });
+    _controlsTimer?.cancel();
+    _controlsTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        final isPlaying = _videoController?.value.isPlaying ?? false;
+        if (isPlaying) {
+          setState(() {
+            _areControlsVisible = false;
+          });
+        }
+      }
+    });
+  }
 
   @override
   void initState() {
     super.initState();
+    _onUserInteraction();
     // Lock ke landscape saat player dibuka
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
@@ -51,6 +96,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   void dispose() {
+    _controlsTimer?.cancel();
     // Kembalikan orientasi normal saat keluar
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -72,7 +118,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     );
     await _videoController!.initialize();
 
-    _chewieController = ChewieController(
+    _chewieController = MutableChewieController(
       videoPlayerController: _videoController!,
       autoPlay: true,
       looping: false,
@@ -88,7 +134,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       zoomAndPan: true, // Coba aktifkan fitur zoom bawaan chewie jika ada
     );
 
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {});
+      _onUserInteraction();
+    }
   }
 
   @override
@@ -114,67 +163,75 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // ── Video Player ──
-          if (_chewieController != null)
-            Center(
-              child: SizedBox.expand(
-                child: Stack(
-                  children: [
-                    // Ambient glow merah
-                    const DecoratedBox(
-                      decoration: BoxDecoration(
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primaryGlow,
-                            blurRadius: 60,
-                            spreadRadius: 10,
-                          ),
-                        ],
-                      ),
-                    ),
-                    Transform.scale(
-                      scale: scale,
-                      child: Chewie(controller: _chewieController!),
-                    ),
-                    ValueListenableBuilder(
-                      valueListenable: _videoController!,
-                      builder: (context, VideoPlayerValue value, child) {
-                        if (value.isBuffering) {
-                          return const Center(
-                            child: CircularProgressIndicator(
-                              color: AppColors.primary,
+      body: Listener(
+        onPointerDown: (_) => _onUserInteraction(),
+        onPointerMove: (_) => _onUserInteraction(),
+        child: Stack(
+          children: [
+            // ── Video Player ──
+            if (_chewieController != null)
+              Center(
+                child: SizedBox.expand(
+                  child: Stack(
+                    children: [
+                      // Ambient glow merah
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primaryGlow,
+                              blurRadius: 60,
+                              spreadRadius: 10,
                             ),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-                  ],
+                          ],
+                        ),
+                      ),
+                      Chewie(controller: _chewieController!),
+                      ValueListenableBuilder(
+                        valueListenable: _videoController!,
+                        builder: (context, VideoPlayerValue value, child) {
+                          if (value.isBuffering) {
+                            return const Center(
+                              child: CircularProgressIndicator(
+                                color: AppColors.primary,
+                              ),
+                            );
+                          }
+                          return const SizedBox.shrink();
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
           
           // ── Zoom Toggle Button ──
           if (_chewieController != null)
             Positioned(
-              top: 30,
-              right: 50,
-              child: Material(
-                color: Colors.black54,
-                shape: const CircleBorder(),
-                child: IconButton(
-                  iconSize: 28,
-                  icon: Icon(
-                    _isZoomFit ? Icons.zoom_in_map_rounded : Icons.zoom_out_map_rounded,
-                    color: Colors.white,
+              top: 12,
+              right: 60, // Samping tombol opsi (titik tiga)
+              child: AnimatedOpacity(
+                opacity: _areControlsVisible ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 300),
+                child: IgnorePointer(
+                  ignoring: !_areControlsVisible,
+                  child: IconButton(
+                    iconSize: 24,
+                    icon: Icon(
+                      _isZoomFit ? Icons.zoom_in_map_rounded : Icons.zoom_out_map_rounded,
+                      color: Colors.white,
+                    ),
+                    onPressed: () {
+                      _onUserInteraction();
+                      setState(() {
+                        _isZoomFit = !_isZoomFit;
+                        final videoRatio = _videoController!.value.aspectRatio;
+                        final screenRatio = MediaQuery.of(context).size.aspectRatio;
+                        (_chewieController as MutableChewieController).customAspectRatio =
+                            _isZoomFit ? screenRatio : videoRatio;
+                      });
+                    },
                   ),
-                  onPressed: () {
-                    setState(() {
-                      _isZoomFit = !_isZoomFit;
-                    });
-                  },
                 ),
               ),
             ),
@@ -182,20 +239,23 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           // ── Back Button ──
           if (_chewieController != null)
             Positioned(
-              top: 30,
-              left: 50,
-              child: Material(
-                color: Colors.black54,
-                shape: const CircleBorder(),
-                child: IconButton(
-                  iconSize: 28,
-                  icon: const Icon(
-                    Icons.arrow_back_rounded,
-                    color: Colors.white,
+              top: 12,
+              left: 16,
+              child: AnimatedOpacity(
+                opacity: _areControlsVisible ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 300),
+                child: IgnorePointer(
+                  ignoring: !_areControlsVisible,
+                  child: IconButton(
+                    iconSize: 24,
+                    icon: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: Colors.white,
+                    ),
+                    onPressed: () {
+                      context.pop();
+                    },
                   ),
-                  onPressed: () {
-                    context.pop();
-                  },
                 ),
               ),
             ),
