@@ -1,0 +1,2 @@
+# Jalankan Railway Worker untuk bulk enrichment
+worker: node railway-worker.js

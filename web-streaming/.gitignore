@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# SQLite local database (tidak perlu di-push ke Railway)
+dev.db
+*.db
+
+# Test scripts
+test-*.js
+scratch/
