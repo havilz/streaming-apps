@@ -159,14 +159,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           // ── Zoom Toggle Button ──
           if (_chewieController != null)
             Positioned(
-              top: AppSpacing.md,
-              right: AppSpacing.md,
-              child: SafeArea(
+              top: 30,
+              right: 50,
+              child: Material(
+                color: Colors.black54,
+                shape: const CircleBorder(),
                 child: IconButton(
+                  iconSize: 28,
                   icon: Icon(
                     _isZoomFit ? Icons.zoom_in_map_rounded : Icons.zoom_out_map_rounded,
                     color: Colors.white,
-                    shadows: const [Shadow(color: Colors.black, blurRadius: 4)],
                   ),
                   onPressed: () {
                     setState(() {
