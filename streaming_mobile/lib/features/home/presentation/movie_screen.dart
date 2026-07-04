@@ -117,7 +117,8 @@ class _MovieScreenState extends ConsumerState<MovieScreen> {
                   ),
                 ),
 
-                if (movieState.error != null && movieState.trendingItems.isEmpty)
+                if (movieState.error != null &&
+                    movieState.trendingItems.isEmpty)
                   SliverFillRemaining(
                     child: Center(
                       child: Padding(
@@ -187,7 +188,9 @@ class _MovieScreenState extends ConsumerState<MovieScreen> {
                   ),
                 ],
 
-                const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: AppSpacing.xl),
+                ),
               ],
             ),
           ),
@@ -208,10 +211,16 @@ class _MovieScreenState extends ConsumerState<MovieScreen> {
                 return ClipRRect(
                   borderRadius: BorderRadius.circular(20),
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: blurValue, sigmaY: blurValue),
+                    filter: ImageFilter.blur(
+                      sigmaX: blurValue,
+                      sigmaY: blurValue,
+                    ),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: _showGlassBackground
                             ? Colors.black.withValues(alpha: 0.55)
@@ -314,7 +323,12 @@ class _MovieScreenState extends ConsumerState<MovieScreen> {
                     onTap: () {
                       context.push(
                         '/detail/${item.slug}',
-                        extra: {'isSeries': item.isSeries},
+                        extra: {
+                          'isSeries': item.isSeries,
+                          'initialSeason': item.isSeries
+                              ? item.numberOfSeasons
+                              : null,
+                        },
                       );
                     },
                   ),

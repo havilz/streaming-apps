@@ -21,7 +21,8 @@ class NetworkDetailScreen extends ConsumerStatefulWidget {
   final String networkName;
 
   @override
-  ConsumerState<NetworkDetailScreen> createState() => _NetworkDetailScreenState();
+  ConsumerState<NetworkDetailScreen> createState() =>
+      _NetworkDetailScreenState();
 }
 
 class _NetworkDetailScreenState extends ConsumerState<NetworkDetailScreen> {
@@ -88,7 +89,8 @@ class _NetworkDetailScreenState extends ConsumerState<NetworkDetailScreen> {
           RefreshIndicator(
             color: AppColors.primary,
             backgroundColor: AppColors.surface,
-            onRefresh: () => ref.refresh(networkDetailProvider(widget.networkName).future),
+            onRefresh: () =>
+                ref.refresh(networkDetailProvider(widget.networkName).future),
             child: networkAsync.when(
               data: (networkState) {
                 return CustomScrollView(
@@ -101,14 +103,17 @@ class _NetworkDetailScreenState extends ConsumerState<NetworkDetailScreen> {
                       ),
                     ),
 
-                    if (networkState.error != null && networkState.trendingItems.isEmpty)
+                    if (networkState.error != null &&
+                        networkState.trendingItems.isEmpty)
                       SliverFillRemaining(
                         child: Center(
                           child: Padding(
                             padding: const EdgeInsets.all(AppSpacing.xl),
                             child: Text(
                               networkState.error!,
-                              style: const TextStyle(color: AppColors.textMuted),
+                              style: const TextStyle(
+                                color: AppColors.textMuted,
+                              ),
                               textAlign: TextAlign.center,
                             ),
                           ),
@@ -146,7 +151,9 @@ class _NetworkDetailScreenState extends ConsumerState<NetworkDetailScreen> {
                       ),
                     ),
 
-                    const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
+                    const SliverToBoxAdapter(
+                      child: SizedBox(height: AppSpacing.xl),
+                    ),
                   ],
                 );
               },
@@ -165,7 +172,9 @@ class _NetworkDetailScreenState extends ConsumerState<NetworkDetailScreen> {
                       children: [
                         _buildHorizontalShimmerLane(title: 'Trending Now'),
                         _buildHorizontalShimmerLane(title: '🏳️ Best in Genre'),
-                        _buildHorizontalShimmerLane(title: '🏳️ Best in Country'),
+                        _buildHorizontalShimmerLane(
+                          title: '🏳️ Best in Country',
+                        ),
                       ],
                     ),
                   ),
@@ -207,10 +216,16 @@ class _NetworkDetailScreenState extends ConsumerState<NetworkDetailScreen> {
                 return ClipRRect(
                   borderRadius: BorderRadius.circular(20),
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: blurValue, sigmaY: blurValue),
+                    filter: ImageFilter.blur(
+                      sigmaX: blurValue,
+                      sigmaY: blurValue,
+                    ),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: _showGlassBackground
                             ? Colors.black.withValues(alpha: 0.55)
@@ -325,7 +340,12 @@ class _NetworkDetailScreenState extends ConsumerState<NetworkDetailScreen> {
                     onTap: () {
                       context.push(
                         '/detail/${item.slug}',
-                        extra: {'isSeries': item.isSeries},
+                        extra: {
+                          'isSeries': item.isSeries,
+                          'initialSeason': item.isSeries
+                              ? item.numberOfSeasons
+                              : null,
+                        },
                       );
                     },
                   ),

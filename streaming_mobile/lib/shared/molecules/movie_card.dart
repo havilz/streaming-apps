@@ -13,6 +13,7 @@ class MovieCard extends StatefulWidget {
     this.year,
     this.voteAverage,
     this.numberOfSeasons,
+    this.season,
     this.onTap,
   });
 
@@ -21,6 +22,7 @@ class MovieCard extends StatefulWidget {
   final String? year;
   final double? voteAverage;
   final int? numberOfSeasons;
+  final int? season;
   final VoidCallback? onTap;
 
   @override
@@ -81,13 +83,16 @@ class _MovieCardState extends State<MovieCard> {
                   ),
                 ),
 
-                // Season count badge (Top-Right)
-                if (widget.numberOfSeasons != null && widget.numberOfSeasons! > 0)
+                if ((widget.season ?? widget.numberOfSeasons) != null &&
+                    (widget.season ?? widget.numberOfSeasons)! > 0)
                   Positioned(
                     top: 6,
                     right: 6,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: Colors.black.withValues(alpha: 0.65),
                         borderRadius: BorderRadius.circular(4),
@@ -97,7 +102,7 @@ class _MovieCardState extends State<MovieCard> {
                         ),
                       ),
                       child: Text(
-                        'S${widget.numberOfSeasons}',
+                        'S${widget.season ?? widget.numberOfSeasons}',
                         style: const TextStyle(
                           color: AppColors.primary,
                           fontSize: 9,
@@ -116,12 +121,16 @@ class _MovieCardState extends State<MovieCard> {
                     child: Stack(
                       children: [
                         // Rating (Bottom-Left)
-                        if (widget.voteAverage != null && widget.voteAverage! > 0.0)
+                        if (widget.voteAverage != null &&
+                            widget.voteAverage! > 0.0)
                           Positioned(
                             bottom: 6,
                             left: 6,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                                vertical: 3,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.black.withValues(alpha: 0.65),
                                 borderRadius: BorderRadius.circular(4),
@@ -158,7 +167,10 @@ class _MovieCardState extends State<MovieCard> {
                             bottom: 6,
                             right: 6,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 3),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                                vertical: 3,
+                              ),
                               decoration: BoxDecoration(
                                 color: Colors.black.withValues(alpha: 0.65),
                                 borderRadius: BorderRadius.circular(4),

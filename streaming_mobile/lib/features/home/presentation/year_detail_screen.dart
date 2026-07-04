@@ -11,10 +11,7 @@ import 'package:streaming_mobile/features/search/presentation/search_modal.dart'
 import 'package:streaming_mobile/shared/shared.dart';
 
 class YearDetailScreen extends ConsumerStatefulWidget {
-  const YearDetailScreen({
-    super.key,
-    required this.year,
-  });
+  const YearDetailScreen({super.key, required this.year});
 
   final String year;
 
@@ -120,12 +117,20 @@ class _YearDetailScreenState extends ConsumerState<YearDetailScreen> {
               onTap: () => onTap(tab),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
-                  color: isActive ? Colors.white.withValues(alpha: 0.15) : Colors.transparent,
+                  color: isActive
+                      ? Colors.white.withValues(alpha: 0.15)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(6),
                   border: isActive
-                      ? Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1)
+                      ? Border.all(
+                          color: Colors.white.withValues(alpha: 0.1),
+                          width: 1,
+                        )
                       : null,
                 ),
                 child: Text(
@@ -155,7 +160,8 @@ class _YearDetailScreenState extends ConsumerState<YearDetailScreen> {
           RefreshIndicator(
             color: AppColors.primary,
             backgroundColor: AppColors.surface,
-            onRefresh: () => ref.refresh(yearDetailProvider(widget.year).future),
+            onRefresh: () =>
+                ref.refresh(yearDetailProvider(widget.year).future),
             child: yearAsync.when(
               data: (yearState) {
                 final trendingFiltered = yearState.trendingItems.where((item) {
@@ -174,14 +180,17 @@ class _YearDetailScreenState extends ConsumerState<YearDetailScreen> {
                       ),
                     ),
 
-                    if (yearState.error != null && yearState.trendingItems.isEmpty)
+                    if (yearState.error != null &&
+                        yearState.trendingItems.isEmpty)
                       SliverFillRemaining(
                         child: Center(
                           child: Padding(
                             padding: const EdgeInsets.all(AppSpacing.xl),
                             child: Text(
                               yearState.error!,
-                              style: const TextStyle(color: AppColors.textMuted),
+                              style: const TextStyle(
+                                color: AppColors.textMuted,
+                              ),
                               textAlign: TextAlign.center,
                             ),
                           ),
@@ -245,7 +254,9 @@ class _YearDetailScreenState extends ConsumerState<YearDetailScreen> {
                       ),
                     ),
 
-                    const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
+                    const SliverToBoxAdapter(
+                      child: SizedBox(height: AppSpacing.xl),
+                    ),
                   ],
                 );
               },
@@ -306,10 +317,16 @@ class _YearDetailScreenState extends ConsumerState<YearDetailScreen> {
                 return ClipRRect(
                   borderRadius: BorderRadius.circular(20),
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: blurValue, sigmaY: blurValue),
+                    filter: ImageFilter.blur(
+                      sigmaX: blurValue,
+                      sigmaY: blurValue,
+                    ),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: _showGlassBackground
                             ? Colors.black.withValues(alpha: 0.55)
@@ -424,7 +441,12 @@ class _YearDetailScreenState extends ConsumerState<YearDetailScreen> {
                     onTap: () {
                       context.push(
                         '/detail/${item.slug}',
-                        extra: {'isSeries': item.isSeries},
+                        extra: {
+                          'isSeries': item.isSeries,
+                          'initialSeason': item.isSeries
+                              ? item.numberOfSeasons
+                              : null,
+                        },
                       );
                     },
                   ),

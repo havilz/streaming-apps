@@ -8,10 +8,16 @@ import 'package:streaming_mobile/features/home/data/movie_model.dart';
 import 'package:streaming_mobile/shared/shared.dart';
 
 class DetailScreen extends ConsumerWidget {
-  const DetailScreen({super.key, required this.slug, required this.isSeries});
+  const DetailScreen({
+    super.key,
+    required this.slug,
+    required this.isSeries,
+    this.initialSeason,
+  });
 
   final String slug;
   final bool isSeries;
+  final int? initialSeason;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -27,7 +33,11 @@ class DetailScreen extends ConsumerWidget {
           data: (series) {
             if (series == null)
               return const _ErrorBody(message: 'Series tidak ditemukan.');
-            return _SeriesBody(series: series, slug: slug);
+            return _SeriesBody(
+              series: series,
+              slug: slug,
+              initialSeason: initialSeason,
+            );
           },
         ),
       );
@@ -109,51 +119,78 @@ class _MovieBody extends StatelessWidget {
 
 // ── Series Body ───────────────────────────────────────────────
 
-class _SeriesBody extends ConsumerWidget {
-  const _SeriesBody({required this.series, required this.slug});
+class _SeriesBody extends ConsumerStatefulWidget {
+  const _SeriesBody({
+    required this.series,
+    required this.slug,
+    this.initialSeason,
+  });
+
   final SeriesModel series;
   final String slug;
+  final int? initialSeason;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final activeSeason = ref.watch(activeSeasonProviderFor(slug));
+  ConsumerState<_SeriesBody> createState() => _SeriesBodyState();
+}
+
+class _SeriesBodyState extends ConsumerState<_SeriesBody> {
+  @override
+  void initState() {
+    super.initState();
+    final initialSeason = widget.initialSeason;
+    if (initialSeason != null && initialSeason > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final activeSeasonProvider = activeSeasonProviderFor(widget.slug);
+        final currentActive = ref.read(activeSeasonProvider);
+        if (currentActive != initialSeason) {
+          ref.read(activeSeasonProvider.notifier).set(initialSeason);
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final activeSeason = ref.watch(activeSeasonProviderFor(widget.slug));
     final episodes = ref.watch(
-      episodesProvider((seriesId: series.id, season: activeSeason)),
+      episodesProvider((seriesId: widget.series.id, season: activeSeason)),
     );
 
     return CustomScrollView(
       slivers: [
-        _BackdropAppBar(backdropUrl: series.backdropUrl),
+        _BackdropAppBar(backdropUrl: widget.series.backdropUrl),
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                AppText(series.title, variant: AppTextVariant.heading),
+                AppText(widget.series.title, variant: AppTextVariant.heading),
                 const SizedBox(height: AppSpacing.xs),
                 _MetaRow(
-                  year: series.year,
-                  voteAverage: series.voteAverage,
-                  quality: series.quality,
-                  extra: series.status,
+                  year: widget.series.year,
+                  voteAverage: widget.series.voteAverage,
+                  quality: widget.series.quality,
+                  extra: widget.series.status,
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                if (series.genres.isNotEmpty)
-                  _GenreBadges(genres: series.genres),
+                if (widget.series.genres.isNotEmpty)
+                  _GenreBadges(genres: widget.series.genres),
                 const SizedBox(height: AppSpacing.md),
                 _PlayButton(
                   onTap: () => context.push(
-                    '/player/${series.id}',
-                    extra: {'slug': slug, 'isMovie': false},
+                    '/player/${widget.series.id}',
+                    extra: {'slug': widget.slug, 'isMovie': false},
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                if (series.overview != null && series.overview!.isNotEmpty) ...[
+                if (widget.series.overview != null &&
+                    widget.series.overview!.isNotEmpty) ...[
                   const AppText('Sinopsis', variant: AppTextVariant.title),
                   const SizedBox(height: AppSpacing.xs),
                   AppText(
-                    series.overview!,
+                    widget.series.overview!,
                     variant: AppTextVariant.body,
                     color: AppColors.textMuted,
                   ),
@@ -165,7 +202,7 @@ class _SeriesBody extends ConsumerWidget {
         ),
 
         // Season selector
-        if ((series.numberOfSeasons ?? 0) > 1)
+        if ((widget.series.numberOfSeasons ?? 0) > 1)
           SliverToBoxAdapter(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -178,10 +215,11 @@ class _SeriesBody extends ConsumerWidget {
                   child: AppText('Season', variant: AppTextVariant.title),
                 ),
                 SeasonSelector(
-                  seasonCount: series.numberOfSeasons!,
+                  seasonCount: widget.series.numberOfSeasons!,
                   activeSeason: activeSeason,
-                  onSeasonSelected: (s) =>
-                      ref.read(activeSeasonProviderFor(slug).notifier).set(s),
+                  onSeasonSelected: (s) => ref
+                      .read(activeSeasonProviderFor(widget.slug).notifier)
+                      .set(s),
                 ),
                 const SizedBox(height: AppSpacing.md),
               ],
@@ -229,7 +267,7 @@ class _SeriesBody extends ConsumerWidget {
                   airDate: ep.airDate,
                   onTap: () => context.push(
                     '/episode/${ep.id}',
-                    extra: {'slug': slug, 'episode': ep},
+                    extra: {'slug': widget.slug, 'episode': ep},
                   ),
                 ),
               );

@@ -54,9 +54,7 @@ class _SearchModalState extends ConsumerState<SearchModal> {
               },
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                child: Container(
-                  color: Colors.black.withValues(alpha: 0.65),
-                ),
+                child: Container(color: Colors.black.withValues(alpha: 0.65)),
               ),
             ),
           ),
@@ -196,7 +194,10 @@ class _SearchModalState extends ConsumerState<SearchModal> {
             // Then navigate to details
             context.push(
               '/detail/${item.slug}',
-              extra: {'isSeries': item.isSeries},
+              extra: {
+                'isSeries': item.isSeries,
+                'initialSeason': item.isSeries ? item.numberOfSeasons : null,
+              },
             );
           },
         );
@@ -215,10 +216,7 @@ void showSearchModal(BuildContext context) {
       return const SearchModal();
     },
     transitionBuilder: (context, anim1, anim2, child) {
-      return FadeTransition(
-        opacity: anim1,
-        child: child,
-      );
+      return FadeTransition(opacity: anim1, child: child);
     },
   );
 }

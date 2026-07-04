@@ -71,7 +71,10 @@ final GoRouter appRouter = GoRouter(
           builder: (context, state) {
             final countryId = int.parse(state.pathParameters['countryId']!);
             final countryName = state.uri.queryParameters['name'] ?? '';
-            return CountryDetailScreen(countryId: countryId, countryName: countryName);
+            return CountryDetailScreen(
+              countryId: countryId,
+              countryName: countryName,
+            );
           },
         ),
         GoRoute(
@@ -98,7 +101,10 @@ final GoRouter appRouter = GoRouter(
           builder: (context, state) {
             final networkId = int.parse(state.pathParameters['networkId']!);
             final networkName = state.uri.queryParameters['name'] ?? '';
-            return NetworkDetailScreen(networkId: networkId, networkName: networkName);
+            return NetworkDetailScreen(
+              networkId: networkId,
+              networkName: networkName,
+            );
           },
         ),
       ],
@@ -112,7 +118,12 @@ final GoRouter appRouter = GoRouter(
         final slug = state.pathParameters['slug']!;
         final extra = state.extra as Map<String, dynamic>? ?? {};
         final isSeries = extra['isSeries'] as bool? ?? false;
-        return DetailScreen(slug: slug, isSeries: isSeries);
+        final initialSeason = extra['initialSeason'] as int?;
+        return DetailScreen(
+          slug: slug,
+          isSeries: isSeries,
+          initialSeason: initialSeason,
+        );
       },
     ),
 

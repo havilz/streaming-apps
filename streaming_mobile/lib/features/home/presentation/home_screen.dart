@@ -201,24 +201,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   SliverToBoxAdapter(
                     child: Container(
                       key: _genreKey,
-                      child: Builder(builder: (context) {
-                        final genreItems = _genreFilter == 'All'
-                            ? homeState.trendingItems
-                            : homeState.trendingItems
-                                .where((i) => _genreFilter == 'Movie'
-                                    ? !i.isSeries
-                                    : i.isSeries)
-                                .toList();
-                        return _buildHorizontalLane(
-                          title: 'Best in Genre',
-                          items: genreItems,
-                          trailingHeader: _buildDynamicFilterRow(
-                            options: ['All', 'Movie', 'Series'],
-                            active: _genreFilter,
-                            onTap: (v) => setState(() => _genreFilter = v),
-                          ),
-                        );
-                      }),
+                      child: Builder(
+                        builder: (context) {
+                          final genreItems = _genreFilter == 'All'
+                              ? homeState.trendingItems
+                              : homeState.trendingItems
+                                    .where(
+                                      (i) => _genreFilter == 'Movie'
+                                          ? !i.isSeries
+                                          : i.isSeries,
+                                    )
+                                    .toList();
+                          return _buildHorizontalLane(
+                            title: 'Best in Genre',
+                            items: genreItems,
+                            trailingHeader: _buildDynamicFilterRow(
+                              options: ['All', 'Movie', 'Series'],
+                              active: _genreFilter,
+                              onTap: (v) => setState(() => _genreFilter = v),
+                            ),
+                          );
+                        },
+                      ),
                     ),
                   ),
 
@@ -253,7 +257,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 ],
 
-                const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: AppSpacing.xl),
+                ),
               ],
             ),
           ),
@@ -274,15 +280,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 return ClipRRect(
                   borderRadius: BorderRadius.circular(20),
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: blurValue, sigmaY: blurValue),
+                    filter: ImageFilter.blur(
+                      sigmaX: blurValue,
+                      sigmaY: blurValue,
+                    ),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: _showGlassBackground ? 0.5 : 0.0),
+                        color: Colors.black.withValues(
+                          alpha: _showGlassBackground ? 0.5 : 0.0,
+                        ),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: Colors.white.withValues(alpha: _showGlassBackground ? 0.1 : 0.0),
+                          color: Colors.white.withValues(
+                            alpha: _showGlassBackground ? 0.1 : 0.0,
+                          ),
                           width: 1,
                         ),
                       ),
@@ -335,9 +351,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-
-
-// ── Grid konten ───────────────────────────────────────────────
+  // ── Grid konten ───────────────────────────────────────────────
 
   Widget _buildHorizontalLane({
     required String title,
@@ -399,7 +413,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       onTap: () {
                         context.push(
                           '/detail/${item.slug}',
-                          extra: {'isSeries': item.isSeries},
+                          extra: {
+                            'isSeries': item.isSeries,
+                            'initialSeason': item.isSeries
+                                ? item.numberOfSeasons
+                                : null,
+                          },
                         );
                       },
                     ),
@@ -485,12 +504,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               onTap: () => onTap(tab),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
-                  color: isActive ? Colors.white.withValues(alpha: 0.15) : Colors.transparent,
+                  color: isActive
+                      ? Colors.white.withValues(alpha: 0.15)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(6),
                   border: isActive
-                      ? Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1)
+                      ? Border.all(
+                          color: Colors.white.withValues(alpha: 0.1),
+                          width: 1,
+                        )
                       : null,
                 ),
                 child: Text(
@@ -622,10 +649,14 @@ class _HeroSectionState extends State<HeroSection>
 
   int _getCount(List<ContentItem> items) {
     final featuredItems = items
-        .where((item) => item.backdropUrl != null && item.backdropUrl!.isNotEmpty)
+        .where(
+          (item) => item.backdropUrl != null && item.backdropUrl!.isNotEmpty,
+        )
         .take(10)
         .toList();
-    return featuredItems.isNotEmpty ? featuredItems.length : items.take(10).length;
+    return featuredItems.isNotEmpty
+        ? featuredItems.length
+        : items.take(10).length;
   }
 
   void _goToNextPage() {
@@ -647,7 +678,9 @@ class _HeroSectionState extends State<HeroSection>
   @override
   Widget build(BuildContext context) {
     final featuredItems = widget.items
-        .where((item) => item.backdropUrl != null && item.backdropUrl!.isNotEmpty)
+        .where(
+          (item) => item.backdropUrl != null && item.backdropUrl!.isNotEmpty,
+        )
         .take(10)
         .toList();
 
@@ -656,16 +689,15 @@ class _HeroSectionState extends State<HeroSection>
         : widget.items.take(10).toList();
 
     if (displayItems.isEmpty) {
-      return const AppShimmer(
-        width: double.infinity,
-        height: 380,
-      );
+      return const AppShimmer(width: double.infinity, height: 380);
     }
 
     return AnimatedBuilder(
       animation: widget.scrollController,
       builder: (context, child) {
-        final offset = widget.scrollController.hasClients ? widget.scrollController.offset : 0.0;
+        final offset = widget.scrollController.hasClients
+            ? widget.scrollController.offset
+            : 0.0;
         final progress = (offset / 380).clamp(0.0, 1.0);
         final parallaxOffset = offset * 0.45;
         final scale = 1.0 - (progress * 0.06);
@@ -678,9 +710,7 @@ class _HeroSectionState extends State<HeroSection>
             Container(
               height: 380,
               clipBehavior: Clip.antiAlias,
-              decoration: const BoxDecoration(
-                color: AppColors.background,
-              ),
+              decoration: const BoxDecoration(color: AppColors.background),
               child: Transform.scale(
                 scale: scale,
                 child: Transform.translate(
@@ -719,9 +749,7 @@ class _HeroSectionState extends State<HeroSection>
                               alignment: Alignment.centerLeft,
                               child: FractionallySizedBox(
                                 widthFactor: _animationController.value,
-                                child: Container(
-                                  color: AppColors.primary,
-                                ),
+                                child: Container(color: AppColors.primary),
                               ),
                             );
                           },
@@ -760,8 +788,11 @@ class _HeroSectionState extends State<HeroSection>
           },
           itemBuilder: (context, index) {
             final featuredItem = displayItems[index % displayItems.length];
-            final imageUrl = featuredItem.backdropUrl ?? featuredItem.posterUrl ?? '';
-            final hasBackdrop = featuredItem.backdropUrl != null && featuredItem.backdropUrl!.isNotEmpty;
+            final imageUrl =
+                featuredItem.backdropUrl ?? featuredItem.posterUrl ?? '';
+            final hasBackdrop =
+                featuredItem.backdropUrl != null &&
+                featuredItem.backdropUrl!.isNotEmpty;
 
             return Stack(
               fit: StackFit.expand,
@@ -770,7 +801,9 @@ class _HeroSectionState extends State<HeroSection>
                     ? CachedNetworkImage(
                         imageUrl: imageUrl,
                         fit: hasBackdrop ? BoxFit.cover : BoxFit.contain,
-                        alignment: hasBackdrop ? Alignment.topCenter : Alignment.center,
+                        alignment: hasBackdrop
+                            ? Alignment.topCenter
+                            : Alignment.center,
                         placeholder: (_, __) => const AppShimmer(
                           width: double.infinity,
                           height: double.infinity,
@@ -874,11 +907,15 @@ class _HeroSectionState extends State<HeroSection>
                             const SizedBox(width: 8),
                             const Text(
                               '•',
-                              style: TextStyle(color: Colors.white38, fontSize: 12),
+                              style: TextStyle(
+                                color: Colors.white38,
+                                fontSize: 12,
+                              ),
                             ),
                             const SizedBox(width: 8),
                           ],
-                          if (featuredItem.year != null && featuredItem.year!.isNotEmpty) ...[
+                          if (featuredItem.year != null &&
+                              featuredItem.year!.isNotEmpty) ...[
                             Text(
                               featuredItem.year!,
                               style: const TextStyle(
@@ -888,10 +925,14 @@ class _HeroSectionState extends State<HeroSection>
                             ),
                             const SizedBox(width: 8),
                           ],
-                          if (featuredItem.quality != null && featuredItem.quality!.isNotEmpty) ...[
+                          if (featuredItem.quality != null &&
+                              featuredItem.quality!.isNotEmpty) ...[
                             const Text(
                               '•',
-                              style: TextStyle(color: Colors.white38, fontSize: 12),
+                              style: TextStyle(
+                                color: Colors.white38,
+                                fontSize: 12,
+                              ),
                             ),
                             const SizedBox(width: 8),
                             Container(
@@ -900,7 +941,10 @@ class _HeroSectionState extends State<HeroSection>
                                 vertical: 1,
                               ),
                               decoration: BoxDecoration(
-                                border: Border.all(color: Colors.white54, width: 0.8),
+                                border: Border.all(
+                                  color: Colors.white54,
+                                  width: 0.8,
+                                ),
                                 borderRadius: BorderRadius.circular(3),
                               ),
                               child: Text(
@@ -916,7 +960,8 @@ class _HeroSectionState extends State<HeroSection>
                         ],
                       ),
                       const SizedBox(height: AppSpacing.sm),
-                      if (featuredItem.overview != null && featuredItem.overview!.isNotEmpty) ...[
+                      if (featuredItem.overview != null &&
+                          featuredItem.overview!.isNotEmpty) ...[
                         Text(
                           featuredItem.overview!,
                           maxLines: 2,
@@ -946,7 +991,11 @@ class _HeroSectionState extends State<HeroSection>
                             );
                           }
                         },
-                        icon: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 20),
+                        icon: const Icon(
+                          Icons.play_arrow_rounded,
+                          color: Colors.black,
+                          size: 20,
+                        ),
                         label: const Text(
                           'Putar',
                           style: TextStyle(

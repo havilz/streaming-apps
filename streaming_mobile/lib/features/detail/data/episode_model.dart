@@ -28,11 +28,14 @@ class EpisodeModel {
   final String? videoUrl;
   final String? videoType;
 
-  /// URL lengkap thumbnail episode (300px width).
+  /// URL lengkap thumbnail episode.
+  ///
+  /// Untuk tampilan poster episode dengan kualitas lebih baik,
+  /// gunakan ukuran `w780` dari TMDB.
   String? get stillUrl {
     if (stillPath == null || stillPath!.isEmpty) return null;
     if (stillPath!.startsWith('http')) return stillPath;
-    return '$_tmdbBase/w300$stillPath';
+    return '$_tmdbBase/w780$stillPath';
   }
 
   factory EpisodeModel.fromMap(Map<String, dynamic> map) {

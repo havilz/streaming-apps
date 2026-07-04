@@ -21,7 +21,8 @@ class CountryDetailScreen extends ConsumerStatefulWidget {
   final String countryName;
 
   @override
-  ConsumerState<CountryDetailScreen> createState() => _CountryDetailScreenState();
+  ConsumerState<CountryDetailScreen> createState() =>
+      _CountryDetailScreenState();
 }
 
 class _CountryDetailScreenState extends ConsumerState<CountryDetailScreen> {
@@ -122,12 +123,20 @@ class _CountryDetailScreenState extends ConsumerState<CountryDetailScreen> {
               onTap: () => onTap(tab),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
-                  color: isActive ? Colors.white.withValues(alpha: 0.15) : Colors.transparent,
+                  color: isActive
+                      ? Colors.white.withValues(alpha: 0.15)
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(6),
                   border: isActive
-                      ? Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1)
+                      ? Border.all(
+                          color: Colors.white.withValues(alpha: 0.1),
+                          width: 1,
+                        )
                       : null,
                 ),
                 child: Text(
@@ -157,10 +166,13 @@ class _CountryDetailScreenState extends ConsumerState<CountryDetailScreen> {
           RefreshIndicator(
             color: AppColors.primary,
             backgroundColor: AppColors.surface,
-            onRefresh: () => ref.refresh(countryDetailProvider(widget.countryId).future),
+            onRefresh: () =>
+                ref.refresh(countryDetailProvider(widget.countryId).future),
             child: countryAsync.when(
               data: (countryState) {
-                final trendingFiltered = countryState.trendingItems.where((item) {
+                final trendingFiltered = countryState.trendingItems.where((
+                  item,
+                ) {
                   if (_trendingFilter == 'Movie') return !item.isSeries;
                   if (_trendingFilter == 'Series') return item.isSeries;
                   return true;
@@ -176,14 +188,17 @@ class _CountryDetailScreenState extends ConsumerState<CountryDetailScreen> {
                       ),
                     ),
 
-                    if (countryState.error != null && countryState.trendingItems.isEmpty)
+                    if (countryState.error != null &&
+                        countryState.trendingItems.isEmpty)
                       SliverFillRemaining(
                         child: Center(
                           child: Padding(
                             padding: const EdgeInsets.all(AppSpacing.xl),
                             child: Text(
                               countryState.error!,
-                              style: const TextStyle(color: AppColors.textMuted),
+                              style: const TextStyle(
+                                color: AppColors.textMuted,
+                              ),
                               textAlign: TextAlign.center,
                             ),
                           ),
@@ -247,7 +262,9 @@ class _CountryDetailScreenState extends ConsumerState<CountryDetailScreen> {
                       ),
                     ),
 
-                    const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
+                    const SliverToBoxAdapter(
+                      child: SizedBox(height: AppSpacing.xl),
+                    ),
                   ],
                 );
               },
@@ -308,10 +325,16 @@ class _CountryDetailScreenState extends ConsumerState<CountryDetailScreen> {
                 return ClipRRect(
                   borderRadius: BorderRadius.circular(20),
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: blurValue, sigmaY: blurValue),
+                    filter: ImageFilter.blur(
+                      sigmaX: blurValue,
+                      sigmaY: blurValue,
+                    ),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 300),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 6,
+                      ),
                       decoration: BoxDecoration(
                         color: _showGlassBackground
                             ? Colors.black.withValues(alpha: 0.55)
@@ -426,7 +449,12 @@ class _CountryDetailScreenState extends ConsumerState<CountryDetailScreen> {
                     onTap: () {
                       context.push(
                         '/detail/${item.slug}',
-                        extra: {'isSeries': item.isSeries},
+                        extra: {
+                          'isSeries': item.isSeries,
+                          'initialSeason': item.isSeries
+                              ? item.numberOfSeasons
+                              : null,
+                        },
                       );
                     },
                   ),
