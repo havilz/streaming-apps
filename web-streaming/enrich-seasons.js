@@ -174,6 +174,41 @@ async function fetchTmdbSeasonEpisodes(tmdbId, seasonNumber) {
   }
 }
 
+// Cari TMDB ID dari slug (contoh: 'renegade-nell-2024' → id 12345)
+function parseSlug(slug) {
+  // Ambil tahun dari akhir slug jika ada (format: nama-nama-YYYY)
+  const yearMatch = slug.match(/-([0-9]{4})$/);
+  const year = yearMatch ? yearMatch[1] : null;
+  // Hapus tahun dari slug, ganti tanda hubung dengan spasi
+  const title = slug
+    .replace(/-[0-9]{4}$/, '')
+    .replace(/-/g, ' ');
+  return { title, year };
+}
+
+async function searchTmdbBySlug(slug) {
+  const { title, year } = parseSlug(slug);
+  try {
+    const params = new URLSearchParams({ query: title, language: 'en-US' });
+    if (year) params.set('first_air_date_year', year);
+    const res = await fetch(
+      `https://api.themoviedb.org/3/search/tv?${params.toString()}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${TMDB_TOKEN}`,
+          'Accept': 'application/json',
+        },
+      },
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const first = data.results?.[0];
+    return first ? first.id : null; // kembalikan TMDB ID
+  } catch {
+    return null;
+  }
+}
+
 // --- References Helper ---
 const genreCache = new Map();
 const countryCache = new Map();
@@ -252,12 +287,19 @@ async function main() {
 
       // === FALLBACK TMDB: jika IDLIX diblokir/tidak ditemukan ===
       if (!detail) {
-        const tmdbId = series.tmdb_id;
+        let tmdbId = series.tmdb_id;
+
+        // Jika tidak ada tmdb_id di DB, cari via TMDB Search
         if (!tmdbId) {
-          console.log(`   ⚠️ IDLIX tidak ditemukan, dan tidak ada tmdb_id → dilewati.`);
-          failed++;
-          await sleep(300);
-          continue;
+          console.log(`   🔍 Tidak ada tmdb_id, mencari di TMDB via slug: ${series.slug}...`);
+          tmdbId = await searchTmdbBySlug(series.slug);
+          if (!tmdbId) {
+            console.log(`   ⚠️ Tidak ditemukan di TMDB → dilewati.`);
+            failed++;
+            await sleep(300);
+            continue;
+          }
+          console.log(`   ✅ Ditemukan tmdb_id: ${tmdbId}`);
         }
 
         console.log(`   ℹ️ IDLIX tidak ditemukan, fallback ke TMDB (id: ${tmdbId})...`);
