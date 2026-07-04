@@ -219,6 +219,16 @@ async function main() {
 
       if (!raw) {
         failed++;
+        // ── Tandai sebagai "tidak ditemukan" agar tidak muncul lagi di batch berikutnya.
+        // Tanpa ini, item yang sama akan terus-menerus diproses ulang setiap ronde (infinite loop).
+        try {
+          const table = TYPE === 'series' ? 'series' : 'movies';
+          await supabaseRequest('PATCH', `${table}?id=eq.${encodeURIComponent(item.id)}`, {
+            overview: '[Data tidak tersedia]',
+          });
+        } catch {
+          // Abaikan error PATCH penanda, lanjut ke item berikutnya
+        }
         await sleep(DELAY);
         continue;
       }
