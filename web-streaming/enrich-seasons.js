@@ -9,32 +9,35 @@
 import { gotScraping } from 'got-scraping';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// --- Load .env ---
+// --- Load .env (opsional, untuk lokal) — Railway menggunakan process.env ---
 const envVars = {};
-try {
-  const envContent = readFileSync(path.join(__dirname, '.env'), 'utf8');
-  for (const line of envContent.split('\n')) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const [key, ...rest] = trimmed.split('=');
-    if (key) envVars[key.trim()] = rest.join('=').trim();
+const envPath = path.join(__dirname, '.env');
+if (existsSync(envPath)) {
+  try {
+    const envContent = readFileSync(envPath, 'utf8');
+    for (const line of envContent.split('\n')) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+      const [key, ...rest] = trimmed.split('=');
+      if (key) envVars[key.trim()] = rest.join('=').trim();
+    }
+  } catch {
+    // Abaikan error, Railway sudah punya env vars sendiri
   }
-} catch {
-  console.error('❌ File .env tidak ditemukan');
-  process.exit(1);
 }
 
-const SUPABASE_URL = envVars['SUPABASE_URL'];
-const SUPABASE_KEY = envVars['SUPABASE_SERVICE_KEY'];
-const TMDB_TOKEN   = envVars['TMDB_READ_TOKEN'];
-const BASE_URL     = envVars['IDLIX_BASE_URL'] || 'https://z2.idlixku.com';
+// Prioritaskan process.env (Railway), fallback ke .env lokal
+const SUPABASE_URL = process.env.SUPABASE_URL      || envVars['SUPABASE_URL'];
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || envVars['SUPABASE_SERVICE_KEY'];
+const TMDB_TOKEN   = process.env.TMDB_READ_TOKEN   || envVars['TMDB_READ_TOKEN'];
+const BASE_URL     = process.env.IDLIX_BASE_URL     || envVars['IDLIX_BASE_URL'] || 'https://z2.idlixku.com';
 
 if (!SUPABASE_URL || !SUPABASE_KEY || !TMDB_TOKEN) {
-  console.error('❌ Harap pastikan SUPABASE_URL, SUPABASE_SERVICE_KEY, dan TMDB_READ_TOKEN ada di .env');
+  console.error('❌ SUPABASE_URL, SUPABASE_SERVICE_KEY, dan TMDB_READ_TOKEN wajib diisi (env variable atau .env)');
   process.exit(1);
 }
 
