@@ -42,6 +42,7 @@ dependencies:
   video_player: ^2.11.1
   chewie: ^1.14.1
   audioplayers: ^6.0.0
+  wakelock_plus: ^1.6.1
 
 dev_dependencies:
   flutter_test:

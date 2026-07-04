@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:streaming_mobile/core/core.dart';
 import 'package:streaming_mobile/features/detail/data/data.dart';
 import 'package:streaming_mobile/features/detail/domain/detail_provider.dart';
@@ -448,6 +449,7 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
   @override
   void initState() {
     super.initState();
+    WakelockPlus.enable();
     // Mulai unlock stream tanpa mengunci orientasi ke landscape
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref
@@ -458,6 +460,7 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
 
   @override
   void dispose() {
+    WakelockPlus.disable();
     _chewieController?.dispose();
     _videoController?.dispose();
     super.dispose();

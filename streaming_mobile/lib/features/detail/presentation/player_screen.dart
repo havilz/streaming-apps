@@ -7,6 +7,7 @@ import 'package:streaming_mobile/features/detail/domain/detail_provider.dart';
 import 'package:streaming_mobile/shared/atoms/app_text.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({
@@ -37,6 +38,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       DeviceOrientation.landscapeRight,
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersive);
+    WakelockPlus.enable();
 
     // Mulai unlock stream
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -51,6 +53,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     // Kembalikan orientasi normal saat keluar
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    WakelockPlus.disable();
     _chewieController?.dispose();
     _videoController?.dispose();
     super.dispose();
