@@ -131,7 +131,6 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         bufferedColor: AppColors.primaryGlow,
         backgroundColor: AppColors.surface,
       ),
-      zoomAndPan: true, // Coba aktifkan fitur zoom bawaan chewie jika ada
     );
 
     if (mounted) {
@@ -268,8 +267,9 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 // ── Countdown overlay saat proses unlock berlangsung ─────────
