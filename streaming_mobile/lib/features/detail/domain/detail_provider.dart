@@ -27,6 +27,14 @@ final seriesDetailProvider = FutureProvider.family<SeriesModel?, String>((
   return ref.read(detailRepositoryProvider).fetchSeriesDetail(slug);
 });
 
+/// Provider untuk detail satu episode (tabel `episodes`)
+final episodeDetailProvider = FutureProvider.family<EpisodeModel?, String>((
+  ref,
+  episodeId,
+) async {
+  return ref.read(detailRepositoryProvider).fetchEpisodeById(episodeId);
+});
+
 // ── Season aktif ─────────────────────────────────────────────
 
 class ActiveSeasonNotifier extends Notifier<int> {

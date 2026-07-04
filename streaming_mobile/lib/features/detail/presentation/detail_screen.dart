@@ -228,8 +228,8 @@ class _SeriesBody extends ConsumerWidget {
                   stillUrl: ep.stillUrl,
                   airDate: ep.airDate,
                   onTap: () => context.push(
-                    '/player/${ep.id}',
-                    extra: {'slug': slug, 'isMovie': false},
+                    '/episode/${ep.id}',
+                    extra: {'slug': slug, 'episode': ep},
                   ),
                 ),
               );

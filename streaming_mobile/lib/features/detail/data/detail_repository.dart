@@ -44,6 +44,18 @@ class DetailRepository {
     return (data as List).map((e) => EpisodeModel.fromMap(e)).toList();
   }
 
+  /// Ambil detail satu episode berdasarkan ID.
+  Future<EpisodeModel?> fetchEpisodeById(String episodeId) async {
+    final data = await supabaseClient
+        .from(ApiEndpoints.episodes)
+        .select()
+        .eq('id', episodeId)
+        .maybeSingle();
+    if (data == null) return null;
+    return EpisodeModel.fromMap(data);
+  }
+
+
   /// Unlock stream URL via Supabase Edge Function `unlock-stream`.
   /// Edge Function menjalankan 3-step Pentos flow di server
   /// sehingga tidak terkena Cloudflare 403 di Android.

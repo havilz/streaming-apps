@@ -89,6 +89,7 @@ class EpisodeTile extends StatelessWidget {
                   AppText(
                     title,
                     variant: AppTextVariant.body,
+                    color: isActive ? AppColors.primary : null,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),

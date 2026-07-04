@@ -1,5 +1,7 @@
 import 'package:go_router/go_router.dart';
+import 'package:streaming_mobile/features/detail/data/episode_model.dart';
 import 'package:streaming_mobile/features/detail/presentation/detail_screen.dart';
+import 'package:streaming_mobile/features/detail/presentation/episode_detail_screen.dart';
 import 'package:streaming_mobile/features/detail/presentation/player_screen.dart';
 import 'package:streaming_mobile/features/home/presentation/home_screen.dart';
 import 'package:streaming_mobile/features/home/presentation/movie_screen.dart';
@@ -111,6 +113,22 @@ final GoRouter appRouter = GoRouter(
         final extra = state.extra as Map<String, dynamic>? ?? {};
         final isSeries = extra['isSeries'] as bool? ?? false;
         return DetailScreen(slug: slug, isSeries: isSeries);
+      },
+    ),
+
+    GoRoute(
+      path: '/episode/:episodeId',
+      name: 'episode_detail',
+      builder: (context, state) {
+        final episodeId = state.pathParameters['episodeId']!;
+        final extra = state.extra as Map<String, dynamic>? ?? {};
+        final episode = extra['episode'] as EpisodeModel?;
+        final slug = extra['slug'] as String? ?? '';
+        return EpisodeDetailScreen(
+          episodeId: episodeId,
+          slug: slug,
+          initialEpisode: episode,
+        );
       },
     ),
 

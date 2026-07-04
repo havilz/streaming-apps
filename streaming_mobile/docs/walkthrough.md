@@ -353,12 +353,22 @@ Semua dokumen perancangan awal dibuat di folder `docs/`:
   - **Animasi Logo**: Logo membesar perlahan (*scaling*), memudar masuk (*opacity*), dengan kerenggangan karakter (*letter spacing*) yang merapat sinematik dan efek cahaya pendar (*glow shadows*) yang melebar seiring jalannya waktu.
   - **Efek Suara Bioskop**: Mengintegrasikan pustaka `audioplayers` untuk memutar efek suara intro bioskop dari berkas lokal Anda (`assets/sounds/Netflix intro - QuickSounds.com.mp3`) tepat saat aplikasi dibuka, menyelaraskan transisi audio dan visual selama 3,5 detik sebelum mengarah ke halaman beranda (`/`).
 
+- **Halaman Detail Episode Premium**:
+  - Membuat `EpisodeDetailScreen` bergaya sinematik premium dengan transisi pudar atas (*backdrop overlay*) yang menampilkan thumbnail/still episode.
+  - Membaca data episode secara asinkronus menggunakan provider baru `episodeDetailProvider` dari Supabase, dengan kemampuan memuat data awal `initialEpisode` secara sinkron dari layar sebelumnya untuk *zero-latency transition*.
+  - Menambahkan *fallback mechanism*: jika episode tidak memiliki thumbnail khusus, sistem secara otomatis memuat gambar *backdrop* dari serial TV induknya sebagai gambar latar atas.
+  - Menyajikan sinopsis penuh episode, nomor season/episode, durasi, dan tanggal rilis.
+  - **Tombol Putar Overlay**: Memindahkan tombol play dari tombol terpisah di bawah metadata menjadi tombol melayang (*overlay*) lingkaran merah neon (`AppColors.primary`) dengan efek glow bercahaya tepat di tengah-tengah gambar poster/backdrop episode.
+  - Mengubah alur navigasi dari detail series: mengklik item episode sekarang diarahkan ke `/episode/:episodeId` terlebih dahulu, bukan langsung ke pemutar.
+
 **Keputusan teknis:**
 - Penggunaan `GoRouterState.of(context).uri.path` di level pemanggilan menu modal untuk mendeteksi rute aktif saat dialog/modal terbuka.
 - Pembatasan judul dengan `Expanded` dan `ellipsis` sebagai standar penanganan tata letak agar teks panjang terpotong secara bersih di semua ukuran layar.
 - Kueri parallel via `Future.wait` untuk mempercepat pemuatan tahun dinamis tanpa mengganggu performa responsivitas antarmuka.
 - Menggunakan `flutter_launcher_icons` dalam `dev_dependencies` untuk menghasilkan seluruh ukuran resolusi ikon aplikasi secara otomatis dan patuh terhadap standar build Play Store & App Store.
 - Memanfaatkan paket `audioplayers` menggunakan instansiasi `AssetSource` untuk pemutaran audio aset secara efisien dan andal pada platform seluler tanpa membebani memori (menggunakan `AudioPlayer.dispose()` saat keluar layar).
+- Penyediaan parameter `initialEpisode` pada `EpisodeDetailScreen` agar antarmuka terisi instan tanpa *flicker loading* putih/kosong saat perpindahan layar, sementara kueri Supabase tetap berjalan di latar belakang untuk sinkronisasi data terbaru.
+- Menambahkan visual overlay pemutar video (`Material` & `InkWell` dengan container circular merah glow) di atas `SliverAppBar` sebagai pemicu pemutaran video demi menghemat ruang dan meniru gaya antarmuka bioskop profesional.
 
 ---
 

@@ -197,3 +197,5 @@ Daftar ini digunakan untuk memantau progress pengerjaan aplikasi mobile. Setiap 
 - [x] Pasang dan konfigurasi `flutter_launcher_icons` dengan aset `assets/images/apps.icon.png` untuk memperbarui ikon aplikasi launcher secara otomatis
 - [x] Pasang dan konfigurasi paket `audioplayers` untuk pemutaran efek suara MP3 bioskop
 - [x] Implementasikan halaman `SplashScreen` dengan animasi logo "Sv" (scaling, opacity, letter spacing, glow shadow) terintegrasi dengan pemutaran efek suara MP3 bioskop selama 3.5 detik, lalu arahkan ke beranda utama
+- [x] Implementasikan halaman `EpisodeDetailScreen` bergaya sinematik premium untuk menampilkan sinopsis, detail episode, daftar episode dinamis, serta tombol putar overlay di atas gambar poster
+
