@@ -32,11 +32,12 @@ const SUPABASE_URL = envVars['SUPABASE_URL'];
 const SUPABASE_KEY = envVars['SUPABASE_SERVICE_KEY'];
 const TMDB_TOKEN = envVars['TMDB_READ_TOKEN'];
 
-async function supabaseRequest(method, endpoint, body) {
+async function supabaseRequest(method, endpoint, body, extraHeaders = {}) {
   const headers = {
     'Content-Type': 'application/json',
     'apikey': SUPABASE_KEY,
     'Authorization': `Bearer ${SUPABASE_KEY}`,
+    ...extraHeaders,
   };
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${endpoint}`, {
     method,
@@ -87,14 +88,33 @@ function isTitleMatch(searchTitle, tmdbName, tmdbOriginalName) {
 }
 
 async function main() {
-  log("Fetching all series from Supabase...");
-  const series = await supabaseRequest('GET', 'series?tmdb_id=not.is.null&select=id,slug,title,tmdb_id');
-  if (!series || series.length === 0) {
+  log("Fetching all series from Supabase with pagination...");
+  let series = [];
+  let page = 0;
+  const pageSize = 1000;
+  
+  while (true) {
+    const start = page * pageSize;
+    const end = start + pageSize - 1;
+    log(`Fetching page ${page + 1} (range ${start}-${end})...`);
+    const pageSeries = await supabaseRequest(
+      'GET', 
+      'series?tmdb_id=not.is.null&select=id,slug,title,tmdb_id', 
+      null, 
+      { 'Range': `${start}-${end}` }
+    );
+    if (!pageSeries || pageSeries.length === 0) break;
+    series = series.concat(pageSeries);
+    if (pageSeries.length < pageSize) break;
+    page++;
+  }
+
+  if (series.length === 0) {
     log("No series with tmdb_id found.");
     return;
   }
 
-  log(`Found ${series.length} series with tmdb_id. Checking for corruption...`);
+  log(`Found ${series.length} total series with tmdb_id. Checking for corruption...`);
   let corruptedCount = 0;
 
   for (const s of series) {
