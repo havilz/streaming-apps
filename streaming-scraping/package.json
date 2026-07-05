@@ -1,0 +1,22 @@
+{
+  "name": "streaming-scraping",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node railway-worker.js",
+    "sync": "node full-sync.js",
+    "sync:movies": "node full-sync.js --type movies",
+    "sync:series": "node full-sync.js --type series",
+    "worker": "node railway-worker.js",
+    "enrich:movies": "node enrich-details.js --type movies --limit 100",
+    "enrich:series": "node enrich-seasons.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.11.1",
+    "got-scraping": "^4.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20"
+  }
+}
