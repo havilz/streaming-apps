@@ -197,9 +197,43 @@ function isTitleMatch(searchTitle, tmdbName, tmdbOriginalName) {
       .replace(/[^a-z0-9]/g, '') // Hapus semua karakter lain
       .trim();
   };
+
   const target = clean(searchTitle);
   if (!target) return false;
-  return clean(tmdbName) === target || (tmdbOriginalName && clean(tmdbOriginalName) === target);
+
+  const tName = clean(tmdbName);
+  const tOrg = tmdbOriginalName ? clean(tmdbOriginalName) : '';
+
+  // 1. Match langsung
+  if (target === tName || (tOrg && target === tOrg)) {
+    return true;
+  }
+
+  // 2. Cek pemisahan karakter seperti titik dua (:), strip (-), atau pipe (|)
+  const parts = searchTitle.split(/[:\-|]/).map(p => clean(p.trim())).filter(p => p.length > 2);
+  for (const part of parts) {
+    if (part === tName || (tOrg && part === tOrg)) {
+      return true;
+    }
+  }
+
+  // Cek pemisahan dari sisi TMDB juga (misal TMDB: "Ooku: The Inner Chambers", searchTitle: "Ooku")
+  const tmdbParts = tmdbName.split(/[:\-|]/).map(p => clean(p.trim())).filter(p => p.length > 2);
+  for (const part of tmdbParts) {
+    if (part === target) {
+      return true;
+    }
+  }
+  if (tmdbOriginalName) {
+    const tmdbOrgParts = tmdbOriginalName.split(/[:\-|]/).map(p => clean(p.trim())).filter(p => p.length > 2);
+    for (const part of tmdbOrgParts) {
+      if (part === target) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 async function searchTmdbBySlug(slug) {

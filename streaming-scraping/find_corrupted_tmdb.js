@@ -24,13 +24,17 @@ try {
     if (key) envVars[key.trim()] = rest.join('=').trim();
   }
 } catch {
-  console.error('❌ File .env tidak ditemukan');
-  process.exit(1);
+  // Abaikan error jika .env tidak ada (misalnya saat berjalan di Railway)
 }
 
-const SUPABASE_URL = envVars['SUPABASE_URL'];
-const SUPABASE_KEY = envVars['SUPABASE_SERVICE_KEY'];
-const TMDB_TOKEN = envVars['TMDB_READ_TOKEN'];
+const SUPABASE_URL = process.env.SUPABASE_URL || envVars['SUPABASE_URL'];
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || envVars['SUPABASE_SERVICE_KEY'];
+const TMDB_TOKEN = process.env.TMDB_READ_TOKEN || envVars['TMDB_READ_TOKEN'];
+
+if (!SUPABASE_URL || !SUPABASE_KEY || !TMDB_TOKEN) {
+  console.error('❌ SUPABASE_URL, SUPABASE_SERVICE_KEY, dan TMDB_READ_TOKEN wajib diisi.');
+  process.exit(1);
+}
 
 async function supabaseRequest(method, endpoint, body, extraHeaders = {}) {
   const headers = {
@@ -82,9 +86,43 @@ function isTitleMatch(searchTitle, tmdbName, tmdbOriginalName) {
       .replace(/[^a-z0-9]/g, '') // Hapus semua karakter lain
       .trim();
   };
+
   const target = clean(searchTitle);
   if (!target) return false;
-  return clean(tmdbName) === target || (tmdbOriginalName && clean(tmdbOriginalName) === target);
+
+  const tName = clean(tmdbName);
+  const tOrg = tmdbOriginalName ? clean(tmdbOriginalName) : '';
+
+  // 1. Match langsung
+  if (target === tName || (tOrg && target === tOrg)) {
+    return true;
+  }
+
+  // 2. Cek pemisahan karakter seperti titik dua (:), strip (-), atau pipe (|)
+  const parts = searchTitle.split(/[:\-|]/).map(p => clean(p.trim())).filter(p => p.length > 2);
+  for (const part of parts) {
+    if (part === tName || (tOrg && part === tOrg)) {
+      return true;
+    }
+  }
+
+  // Cek pemisahan dari sisi TMDB juga (misal TMDB: "Ooku: The Inner Chambers", searchTitle: "Ooku")
+  const tmdbParts = tmdbName.split(/[:\-|]/).map(p => clean(p.trim())).filter(p => p.length > 2);
+  for (const part of tmdbParts) {
+    if (part === target) {
+      return true;
+    }
+  }
+  if (tmdbOriginalName) {
+    const tmdbOrgParts = tmdbOriginalName.split(/[:\-|]/).map(p => clean(p.trim())).filter(p => p.length > 2);
+    for (const part of tmdbOrgParts) {
+      if (part === target) {
+        return true;
+      }
+    }
+  }
+
+  return false;
 }
 
 async function main() {
