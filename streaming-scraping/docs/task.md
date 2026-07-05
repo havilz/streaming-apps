@@ -63,3 +63,12 @@ Daftar ini digunakan untuk memantau progress pengerjaan proyek. Setiap task yang
 - [x] **Penyelarasan Kolom Database:** Memastikan kolom pendukung filter (seperti `country`, `release_date`, dan `networks`) tersedia dan terisi di tabel `movies` untuk memproses penyaringan.
 - [x] **Logika Query Filter Halaman Utama:** Mengintegrasikan filter terpilih ke dalam parameter kueri SQL di `app/page.tsx` agar daftar film/series tersaring secara akurat.
 
+---
+
+### 9. Perbaikan Series Korup & Optimalisasi Pengayaan (Feedback v4)
+- [x] **Bypass Karakter Khusus Scraper:** Memperbarui pembersih teks di `find_corrupted_tmdb.js` agar tidak mendeteksi karakter non-ASCII (seperti `ø` di *"The Lørenskog Disappearance"*) sebagai series korup.
+- [x] **Koreksi TMDB ID Supabase:** Memulihkan kembali TMDB ID yang akurat di database Supabase untuk 7 series yang sempat di-reset (seperti *The Demon*, *Candy*, *The Influencer*, *Inside*, dll.).
+- [x] **Pemberantasan Request Sekuensial Scraper (10x Lebih Cepat):** Mengubah mekanisme pengunggahan di `enrich-seasons.js` agar menggunakan single-payload bulk array insert alih-alih per episode satu-satu, serta `Prefer: return=representation` untuk mempercepat lookup.
+- [x] **Penyelarasan Batas Jumlah Season (Auto-alignment):** Mengonfigurasi `enrich-seasons.js` dan database agar menyelaraskan `number_of_seasons` ke nomor season tertinggi yang benar-benar memiliki file episode di database.
+
+

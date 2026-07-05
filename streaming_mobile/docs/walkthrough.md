@@ -372,4 +372,23 @@ Semua dokumen perancangan awal dibuat di folder `docs/`:
 
 ---
 
+## Checkpoint 11 — Custom Netflix Player & Initialization Security
+**Status:** ✅ Selesai
+
+**Yang dikerjakan:**
+- **Custom Player Integration (Netflix-style):**
+  - Mengembangkan custom video player (`custom_video_player.dart`) menggantikan pustaka `chewie` yang kaku.
+  - Fitur: Aspect ratio adjustment (contain/zoom/stretch), double-tap to seek (10 detik maju/mundur dengan animasi), timeline slider merah neon, auto-hide controls dalam 3 detik, dan thin progress bar di bagian bawah layar saat kontrol tersembunyi.
+- **Robust Player Initialization (Try-Catch):**
+  - Membungkus proses inisialisasi controller `_initPlayer` di `episode_detail_screen.dart` dengan blok `try-catch`.
+  - Jika terjadi kegagalan pemuatan HLS stream (seperti file video 404/DMCA takedown), aplikasi akan membatalkan inisialisasi secara bersih tanpa silent freeze/stuck loading, dan memunculkan snackbar peringatan berwarna merah kepada pengguna.
+- **Season Tab Selector Alignment:**
+  - Menyelaraskan logika `numberOfSeasons` agar tidak merender tab season kosong yang disebabkan oleh season Specials (Season 0) di database.
+
+**Keputusan teknis:**
+- Penggunaan blok `try-catch` di tingkat pemutar Flutter untuk menghentikan loop loading dan menampilkan umpan balik visual instan ke pengguna.
+- Menyembunyikan tab season kosong dengan menyelaraskan total season ke season tertinggi dengan episode di database.
+
+---
+
 > Dokumen ini mencatat riwayat pengerjaan, kendala teknis penting, dan alur pengerjaan. Seluruh tugas dalam daftar telah diselesaikan dengan sukses.

@@ -74,7 +74,7 @@ const COUNTRY_MAP = {
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 // --- REST Client untuk Supabase ---
-async function supabaseRequest(method, endpoint, body) {
+async function supabaseRequest(method, endpoint, body, extraHeaders = {}) {
   const url = `${SUPABASE_URL}/rest/v1/${endpoint}`;
   const res = await fetch(url, {
     method,
@@ -83,6 +83,7 @@ async function supabaseRequest(method, endpoint, body) {
       'apikey': SUPABASE_KEY,
       'Authorization': `Bearer ${SUPABASE_KEY}`,
       'Prefer': method === 'POST' ? 'resolution=merge-duplicates' : '',
+      ...extraHeaders,
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -275,8 +276,12 @@ const networkCache = new Map();
 
 async function getOrCreateGenre(name) {
   if (genreCache.has(name)) return genreCache.get(name);
-  await supabaseRequest('POST', 'genres?on_conflict=name', { name });
-  const data = await supabaseRequest('GET', `genres?name=eq.${encodeURIComponent(name)}&select=id`);
+  const data = await supabaseRequest(
+    'POST',
+    'genres?on_conflict=name&select=id',
+    { name },
+    { 'Prefer': 'resolution=merge-duplicates, return=representation' }
+  );
   const id = data?.[0]?.id ?? null;
   if (id) genreCache.set(name, id);
   return id;
@@ -285,8 +290,12 @@ async function getOrCreateGenre(name) {
 async function getOrCreateCountry(code, name) {
   const key = `${code}:${name}`;
   if (countryCache.has(key)) return countryCache.get(key);
-  await supabaseRequest('POST', 'countries?on_conflict=name', { code, name });
-  const data = await supabaseRequest('GET', `countries?name=eq.${encodeURIComponent(name)}&select=id`);
+  const data = await supabaseRequest(
+    'POST',
+    'countries?on_conflict=name&select=id',
+    { code, name },
+    { 'Prefer': 'resolution=merge-duplicates, return=representation' }
+  );
   const id = data?.[0]?.id ?? null;
   if (id) countryCache.set(key, id);
   return id;
@@ -294,8 +303,12 @@ async function getOrCreateCountry(code, name) {
 
 async function getOrCreateNetwork(name, logoPath) {
   if (networkCache.has(name)) return networkCache.get(name);
-  await supabaseRequest('POST', 'networks?on_conflict=name', { name, logo_path: logoPath });
-  const data = await supabaseRequest('GET', `networks?name=eq.${encodeURIComponent(name)}&select=id`);
+  const data = await supabaseRequest(
+    'POST',
+    'networks?on_conflict=name&select=id',
+    { name, logo_path: logoPath },
+    { 'Prefer': 'resolution=merge-duplicates, return=representation' }
+  );
   const id = data?.[0]?.id ?? null;
   if (id) networkCache.set(name, id);
   return id;
@@ -415,41 +428,49 @@ async function main() {
           if (nId) tmdbNetworkIds.push(nId);
         }
 
-        // Update series utama
+        // Update series utama (kecuali number_of_seasons, di-update setelah episode di-scrape)
         await supabaseRequest('PATCH', `series?id=eq.${series.id}`, {
           tmdb_id: tmdbId,
           status: statusTmdb,
           overview: overviewTmdb,
-          number_of_seasons: totalSeasonsTmdb,
         });
 
-        for (const cId of tmdbCountryIds) {
-          await supabaseRequest('POST', 'series_countries?on_conflict=series_id,country_id', {
-            series_id: series.id, country_id: cId,
-          });
+        const countryLinks = tmdbCountryIds.map(cId => ({
+          series_id: series.id, country_id: cId,
+        }));
+        if (countryLinks.length > 0) {
+          await supabaseRequest('POST', 'series_countries?on_conflict=series_id,country_id', countryLinks);
         }
-        for (const nId of tmdbNetworkIds) {
-          await supabaseRequest('POST', 'series_networks?on_conflict=series_id,network_id', {
-            series_id: series.id, network_id: nId,
-          });
+
+        const networkLinks = tmdbNetworkIds.map(nId => ({
+          series_id: series.id, network_id: nId,
+        }));
+        if (networkLinks.length > 0) {
+          await supabaseRequest('POST', 'series_networks?on_conflict=series_id,network_id', networkLinks);
         }
+
+        const genreLinks = [];
         for (const g of tmdbGenres) {
           const genreId = await getOrCreateGenre(g.name);
           if (genreId) {
-            await supabaseRequest('POST', 'series_genres?on_conflict=series_id,genre_id', {
-              series_id: series.id, genre_id: genreId,
-            });
+            genreLinks.push({ series_id: series.id, genre_id: genreId });
           }
+        }
+        if (genreLinks.length > 0) {
+          await supabaseRequest('POST', 'series_genres?on_conflict=series_id,genre_id', genreLinks);
         }
 
         // Ambil episode dari TMDB per season
+        let maxSeasonWithEpisodesTmdb = 0;
         if (totalSeasonsTmdb && totalSeasonsTmdb > 0) {
           console.log(`   -> Mengambil episode dari TMDB untuk ${totalSeasonsTmdb} season...`);
           for (let sNo = 1; sNo <= totalSeasonsTmdb; sNo++) {
             const eps = await fetchTmdbSeasonEpisodes(tmdbId, sNo);
             console.log(`      * Season ${sNo}: ${eps.length} episode ditemukan (via TMDB).`);
-            for (const ep of eps) {
-              await supabaseRequest('POST', 'episodes?on_conflict=id', {
+
+            if (eps.length > 0) {
+              maxSeasonWithEpisodesTmdb = Math.max(maxSeasonWithEpisodesTmdb, sNo);
+              const episodesPayload = eps.map(ep => ({
                 id: ep.id,
                 series_id: series.id,
                 season_number: sNo,
@@ -459,11 +480,17 @@ async function main() {
                 still_path: ep.stillPath ?? null,
                 runtime: ep.runtime ?? null,
                 air_date: ep.airDate ?? null,
-              });
+              }));
+              await supabaseRequest('POST', 'episodes?on_conflict=id', episodesPayload);
             }
             await sleep(200);
           }
         }
+
+        // Update number_of_seasons ke season tertinggi yang benar-benar punya episode
+        await supabaseRequest('PATCH', `series?id=eq.${series.id}`, {
+          number_of_seasons: maxSeasonWithEpisodesTmdb,
+        });
 
         success++;
         console.log(`   ✅ [TMDB fallback] Selesai memperbarui series ${series.slug}`);
@@ -529,52 +556,59 @@ async function main() {
         if (nId) networkIds.push(nId);
       }
 
-      // 4. Update data series utama
-      const totalSeasons = detail.seasons?.length ?? null;
+      // 4. Update data series utama (kecuali number_of_seasons, di-update setelah episode di-scrape)
       await supabaseRequest('PATCH', `series?id=eq.${series.id}`, {
         tmdb_id: tmdbId,
         status: status,
         overview: overview,
-        number_of_seasons: totalSeasons,
       });
 
       // Link countries
-      for (const cId of countryIds) {
-        await supabaseRequest('POST', 'series_countries?on_conflict=series_id,country_id', {
-          series_id: series.id,
-          country_id: cId,
-        });
+      const countryLinks = countryIds.map(cId => ({
+        series_id: series.id,
+        country_id: cId,
+      }));
+      if (countryLinks.length > 0) {
+        await supabaseRequest('POST', 'series_countries?on_conflict=series_id,country_id', countryLinks);
       }
 
       // Link networks
-      for (const nId of networkIds) {
-        await supabaseRequest('POST', 'series_networks?on_conflict=series_id,network_id', {
-          series_id: series.id,
-          network_id: nId,
-        });
+      const networkLinks = networkIds.map(nId => ({
+        series_id: series.id,
+        network_id: nId,
+      }));
+      if (networkLinks.length > 0) {
+        await supabaseRequest('POST', 'series_networks?on_conflict=series_id,network_id', networkLinks);
       }
 
       // Link genres
+      const genreLinks = [];
       const genres = detail.genres ?? [];
       for (const g of genres) {
         const genreId = await getOrCreateGenre(g.name);
         if (genreId) {
-          await supabaseRequest('POST', 'series_genres?on_conflict=series_id,genre_id', {
+          genreLinks.push({
             series_id: series.id,
             genre_id: genreId,
           });
         }
       }
+      if (genreLinks.length > 0) {
+        await supabaseRequest('POST', 'series_genres?on_conflict=series_id,genre_id', genreLinks);
+      }
 
       // 5. Scrape dan simpan semua episode untuk setiap season
+      let maxSeasonWithEpisodes = 0;
       if (detail.seasons && detail.seasons.length > 0) {
         console.log(`   -> Mengambil episode untuk ${detail.seasons.length} season...`);
         for (const season of detail.seasons) {
+          if (season.seasonNumber <= 0) continue; // Skip specials/season 0
           const eps = await fetchEpisodes(series.slug, season.seasonNumber);
           console.log(`      * Season ${season.seasonNumber}: ${eps.length} episode ditemukan.`);
 
-          for (const ep of eps) {
-            await supabaseRequest('POST', 'episodes?on_conflict=id', {
+          if (eps.length > 0) {
+            maxSeasonWithEpisodes = Math.max(maxSeasonWithEpisodes, season.seasonNumber);
+            const episodesPayload = eps.map(ep => ({
               id: ep.id,
               series_id: series.id,
               season_number: season.seasonNumber,
@@ -584,11 +618,17 @@ async function main() {
               still_path: ep.stillPath ?? null,
               runtime: ep.runtime ?? null,
               air_date: ep.airDate ?? null,
-            });
+            }));
+            await supabaseRequest('POST', 'episodes?on_conflict=id', episodesPayload);
           }
           await sleep(200);
         }
       }
+
+      // Update number_of_seasons ke season tertinggi yang benar-benar punya episode
+      await supabaseRequest('PATCH', `series?id=eq.${series.id}`, {
+        number_of_seasons: maxSeasonWithEpisodes,
+      });
 
       success++;
       console.log(`   ✅ Selesai memperbarui series ${series.slug}`);

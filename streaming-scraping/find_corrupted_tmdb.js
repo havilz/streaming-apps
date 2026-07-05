@@ -75,13 +75,19 @@ function parseSlug(slug) {
     .replace(/-/g, ' ');
   return { title, year };
 }
-
 function isTitleMatch(searchTitle, tmdbName, tmdbOriginalName) {
   const clean = (s) => {
     if (!s) return '';
     return s.normalize('NFD') // Hapus aksen (diacritics)
       .replace(/[\u0300-\u036f]/g, '')
       .toLowerCase()
+      .replace(/ø/g, 'o')
+      .replace(/æ/g, 'ae')
+      .replace(/å/g, 'a')
+      .replace(/ß/g, 'ss')
+      .replace(/ä/g, 'a')
+      .replace(/ö/g, 'o')
+      .replace(/ü/g, 'u')
       .replace(/&/g, 'and') // Ubah & menjadi and
       .replace(/[^a-z0-9]/g, '') // Hapus semua karakter lain
       .trim();

@@ -488,35 +488,49 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
   }
 
   Future<void> _initPlayer(String url, {List<SubtitleTrack>? subtitleTracks}) async {
-    final uri = Uri.parse(url);
-    final isHls = uri.path.contains('.m3u8') ||
-        url.contains('m3u8') ||
-        !uri.path.endsWith('.mp4');
+    try {
+      final uri = Uri.parse(url);
+      final isHls = uri.path.contains('.m3u8') ||
+          url.contains('m3u8') ||
+          !uri.path.endsWith('.mp4');
 
-    _videoController = VideoPlayerController.networkUrl(
-      uri,
-      formatHint: isHls ? VideoFormat.hls : null,
-    );
-    await _videoController!.initialize();
-
-    List<PlayerSubtitle>? parsedSubtitles;
-    SubtitleTrack? selectedTrack;
-    if (subtitleTracks != null && subtitleTracks.isNotEmpty) {
-      selectedTrack = subtitleTracks.firstWhere(
-        (t) => t.lang.toLowerCase() == 'id' || t.label.toLowerCase().contains('indo'),
-        orElse: () => subtitleTracks.first,
+      _videoController = VideoPlayerController.networkUrl(
+        uri,
+        formatHint: isHls ? VideoFormat.hls : null,
       );
-      final vttContent = await _fetchUrl(selectedTrack.path);
-      if (vttContent != null) {
-        parsedSubtitles = CustomVideoPlayer.parseVtt(vttContent);
-      }
-    }
+      await _videoController!.initialize();
 
-    if (mounted) {
-      setState(() {
-        _subtitles = parsedSubtitles;
-        _currentSubtitleTrack = selectedTrack;
-      });
+      List<PlayerSubtitle>? parsedSubtitles;
+      SubtitleTrack? selectedTrack;
+      if (subtitleTracks != null && subtitleTracks.isNotEmpty) {
+        selectedTrack = subtitleTracks.firstWhere(
+          (t) => t.lang.toLowerCase() == 'id' || t.label.toLowerCase().contains('indo'),
+          orElse: () => subtitleTracks.first,
+        );
+        final vttContent = await _fetchUrl(selectedTrack.path);
+        if (vttContent != null) {
+          parsedSubtitles = CustomVideoPlayer.parseVtt(vttContent);
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _subtitles = parsedSubtitles;
+          _currentSubtitleTrack = selectedTrack;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _videoController = null;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gagal memuat pemutar video: $e'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     }
   }
 

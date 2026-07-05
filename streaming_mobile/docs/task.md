@@ -198,4 +198,7 @@ Daftar ini digunakan untuk memantau progress pengerjaan aplikasi mobile. Setiap 
 - [x] Pasang dan konfigurasi paket `audioplayers` untuk pemutaran efek suara MP3 bioskop
 - [x] Implementasikan halaman `SplashScreen` dengan animasi logo "Sv" (scaling, opacity, letter spacing, glow shadow) terintegrasi dengan pemutaran efek suara MP3 bioskop selama 3.5 detik, lalu arahkan ke beranda utama
 - [x] Implementasikan halaman `EpisodeDetailScreen` bergaya sinematik premium untuk menampilkan sinopsis, detail episode, daftar episode dinamis, serta tombol putar overlay di atas gambar poster
+- [x] Integrasi Custom Video Player ala Netflix dari nol (menggantikan pustaka Chewie) dengan fitur aspect ratio, double-tap seek, timeline slider, dan kontrol auto-hide
+- [x] Perbaikan inisialisasi video player menggunakan blok `try-catch` untuk menghindari silent crash saat HLS stream gagal dimuat, serta menampilkan pesan error via SnackBar
+- [x] Penyelarasan tampilan tab pemilih season di aplikasi mobile agar sinkron dengan data regular season, menghindari tab kosong yang disebabkan oleh season Specials (Season 0)
 

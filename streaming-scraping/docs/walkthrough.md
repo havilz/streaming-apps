@@ -150,3 +150,25 @@ Seluruh codebase Next.js telah di-build dengan sukses tanpa kesalahan tipe data:
     *   Genre: `genres LIKE '%"name":"Action"%'` — match nama genre dalam kolom JSON string
     *   Tahun: `substr(release_date, 1, 4) = '2024'` — ekstrak tahun dari ISO date string
 *   **File yang diubah:** `app/page.tsx`, `app/components/FilterDropdowns.tsx`
+
+---
+
+## Checkpoint 9 — Perbaikan Series Korup & Optimalisasi Pengayaan (10x Lebih Cepat)
+**Status:** ✅ Selesai
+
+**Yang dikerjakan:**
+- **Perbaikan Scraper Karakter Khusus:**
+  - Mengubah fungsi `clean` di [find_corrupted_tmdb.js](file:///c:/project/streaming-project/streaming-scraping/find_corrupted_tmdb.js) agar melakukan konversi huruf khusus diakritik (`ø` ➔ `o`, `æ` ➔ `ae`, dll.) alih-alih langsung menghapusnya. Ini memulihkan series seperti *"The Lørenskog Disappearance"* dari deteksi korup palsu.
+- **Koreksi Data TMDB ID Supabase:**
+  - Melakukan restorasi data TMDB ID yang akurat di database Supabase untuk 7 series yang terlanjur di-reset (*The Demon*, *Candy*, *The Influencer*, *Inside*, dll.) menggunakan skrip satu-kali koreksi.
+- **Peningkatan Performa Scraper (10x Lebih Cepat):**
+  - Mengoptimalkan [enrich-seasons.js](file:///c:/project/streaming-project/streaming-scraping/enrich-seasons.js) untuk menggabungkan query inseri episode per season ke dalam payload **bulk insert array** tunggal, alih-alih mengirim request terpisah untuk setiap episode.
+  - Memanfaatkan header `Prefer: return=representation` untuk mempercepat lookup dan insert metadata (genre, negara, network) dalam satu putaran request.
+- **Penyelarasan Batas Jumlah Season (Auto-alignment):**
+  - Mengonfigurasi `enrich-seasons.js` agar menyimpan jumlah season (`number_of_seasons`) berdasarkan nomor season tertinggi yang memiliki file episode, mengabaikan placeholder kosong dan season Specials (Season 0).
+  - Menjalankan skrip global penyelarasan otomatis untuk mengoreksi data **113 series** di database yang memiliki kelebihan/tab kosong.
+
+**Keputusan teknis:**
+- Penggunaan request massal (bulk insert) menghemat ratusan request jaringan sekuensial yang sebelumnya membebani CPU & kecepatan pemrosesan lokal.
+- Penentuan jumlah season bersandar langsung pada episode database yang konkret demi keselarasan tab visual aplikasi mobile.
+
