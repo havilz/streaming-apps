@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'dart:convert';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -466,7 +468,101 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
     super.dispose();
   }
 
-  Future<void> _initPlayer(String url) async {
+  Duration _parseVttDuration(String s) {
+    final parts = s.split(':');
+    if (parts.length == 3) {
+      final hours = int.parse(parts[0]);
+      final minutes = int.parse(parts[1]);
+      final secondsParts = parts[2].split('.');
+      final seconds = int.parse(secondsParts[0]);
+      final milliseconds = int.parse(secondsParts[1].padRight(3, '0').substring(0, 3));
+      return Duration(hours: hours, minutes: minutes, seconds: seconds, milliseconds: milliseconds);
+    } else if (parts.length == 2) {
+      final minutes = int.parse(parts[0]);
+      final secondsParts = parts[1].split('.');
+      final seconds = int.parse(secondsParts[0]);
+      final milliseconds = int.parse(secondsParts[1].padRight(3, '0').substring(0, 3));
+      return Duration(minutes: minutes, seconds: seconds, milliseconds: milliseconds);
+    }
+    throw FormatException("Invalid VTT duration: $s");
+  }
+
+  Subtitles _parseVtt(String vttContent) {
+    final List<Subtitle> list = [];
+    final lines = vttContent.replaceAll('\r\n', '\n').split('\n');
+
+    int index = 0;
+    String? timestampLine;
+    final List<String> textLines = [];
+
+    for (var line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) {
+        if (timestampLine != null && textLines.isNotEmpty) {
+          try {
+            final times = timestampLine.split('-->');
+            if (times.length == 2) {
+              final start = _parseVttDuration(times[0].trim());
+              final end = _parseVttDuration(times[1].trim());
+              list.add(Subtitle(
+                index: index++,
+                start: start,
+                end: end,
+                text: textLines.join('\n'),
+              ));
+            }
+          } catch (_) {}
+          timestampLine = null;
+          textLines.clear();
+        }
+        continue;
+      }
+
+      if (trimmed.startsWith('WEBVTT') || trimmed.startsWith('NOTE')) {
+        continue;
+      }
+
+      if (trimmed.contains('-->')) {
+        timestampLine = trimmed;
+      } else if (timestampLine != null) {
+        textLines.add(trimmed);
+      }
+    }
+
+    if (timestampLine != null && textLines.isNotEmpty) {
+      try {
+        final times = timestampLine.split('-->');
+        if (times.length == 2) {
+          final start = _parseVttDuration(times[0].trim());
+          final end = _parseVttDuration(times[1].trim());
+          list.add(Subtitle(
+            index: index++,
+            start: start,
+            end: end,
+            text: textLines.join('\n'),
+          ));
+        }
+      } catch (_) {}
+    }
+
+    return Subtitles(list);
+  }
+
+  Future<String?> _fetchUrl(String url) async {
+    final client = HttpClient();
+    try {
+      final request = await client.getUrl(Uri.parse(url));
+      final response = await request.close();
+      if (response.statusCode == 200) {
+        return await response.transform(utf8.decoder).join();
+      }
+    } catch (_) {} finally {
+      client.close();
+    }
+    return null;
+  }
+
+  Future<void> _initPlayer(String url, {List<SubtitleTrack>? subtitleTracks}) async {
     final uri = Uri.parse(url);
     final isHls = uri.path.contains('.m3u8') ||
         url.contains('m3u8') ||
@@ -478,6 +574,18 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
     );
     await _videoController!.initialize();
 
+    Subtitles? parsedSubtitles;
+    if (subtitleTracks != null && subtitleTracks.isNotEmpty) {
+      final track = subtitleTracks.firstWhere(
+        (t) => t.lang.toLowerCase() == 'id' || t.label.toLowerCase().contains('indo'),
+        orElse: () => subtitleTracks.first,
+      );
+      final vttContent = await _fetchUrl(track.path);
+      if (vttContent != null) {
+        parsedSubtitles = _parseVtt(vttContent);
+      }
+    }
+
     _chewieController = ChewieController(
       videoPlayerController: _videoController!,
       autoPlay: true,
@@ -485,6 +593,32 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
       allowFullScreen: true,
       allowMuting: true,
       showControls: true,
+      subtitle: parsedSubtitles,
+      subtitleBuilder: parsedSubtitles != null
+          ? (context, subtitle) => Positioned(
+                bottom: 25,
+                left: 20,
+                right: 20,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.75),
+                      borderRadius: BorderRadius.circular(6.0),
+                    ),
+                    child: Text(
+                      subtitle.text,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16.0,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+              )
+          : null,
       materialProgressColors: ChewieProgressColors(
         playedColor: AppColors.primary,
         handleColor: AppColors.primary,
@@ -502,7 +636,7 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
 
     ref.listen(streamProviderFor(widget._providerId), (prev, next) {
       if (next.hasResult && _videoController == null) {
-        _initPlayer(next.result!.url);
+        _initPlayer(next.result!.url, subtitleTracks: next.result!.subtitles);
       }
     });
 
