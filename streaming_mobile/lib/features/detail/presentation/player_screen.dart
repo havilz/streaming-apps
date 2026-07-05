@@ -12,6 +12,8 @@ import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+enum VideoScaleMode { fit, zoom, stretch }
+
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({
     super.key,
@@ -31,6 +33,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   VideoPlayerController? _videoController;
   ChewieController? _chewieController;
+  VideoScaleMode _scaleMode = VideoScaleMode.fit;
 
   @override
   void initState() {
@@ -224,6 +227,39 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     if (mounted) setState(() {});
   }
 
+  Widget _buildScaledVideoPlayer() {
+    final size = _videoController!.value.size;
+    final width = size.width;
+    final height = size.height;
+
+    if (width == 0 || height == 0) {
+      return Chewie(controller: _chewieController!);
+    }
+
+    switch (_scaleMode) {
+      case VideoScaleMode.fit:
+        return Chewie(controller: _chewieController!);
+      case VideoScaleMode.zoom:
+        return FittedBox(
+          fit: BoxFit.cover,
+          child: SizedBox(
+            width: width,
+            height: height,
+            child: Chewie(controller: _chewieController!),
+          ),
+        );
+      case VideoScaleMode.stretch:
+        return FittedBox(
+          fit: BoxFit.fill,
+          child: SizedBox(
+            width: width,
+            height: height,
+            child: Chewie(controller: _chewieController!),
+          ),
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final streamState = ref.watch(streamProviderFor(widget.episodeId));
@@ -256,7 +292,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                         ],
                       ),
                     ),
-                    Chewie(controller: _chewieController!),
+                    _buildScaledVideoPlayer(),
                     ValueListenableBuilder(
                       valueListenable: _videoController!,
                       builder: (context, VideoPlayerValue value, child) {
@@ -271,6 +307,61 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                       },
                     ),
                   ],
+                ),
+              ),
+            ),
+
+          // ── Video Sizing Mode Toggle Button (Top-Right) ──
+          if (_chewieController != null)
+            Positioned(
+              top: 16,
+              right: 68,
+              child: ClipOval(
+                child: Material(
+                  color: Colors.black.withOpacity(0.5),
+                  child: IconButton(
+                    icon: Icon(
+                      _scaleMode == VideoScaleMode.fit
+                          ? Icons.fit_screen_outlined
+                          : _scaleMode == VideoScaleMode.zoom
+                              ? Icons.fullscreen_exit_outlined
+                              : Icons.fullscreen_outlined,
+                      color: Colors.white,
+                    ),
+                    tooltip: 'Sizing Mode',
+                    onPressed: () {
+                      setState(() {
+                        if (_scaleMode == VideoScaleMode.fit) {
+                          _scaleMode = VideoScaleMode.zoom;
+                        } else if (_scaleMode == VideoScaleMode.zoom) {
+                          _scaleMode = VideoScaleMode.stretch;
+                        } else {
+                          _scaleMode = VideoScaleMode.fit;
+                        }
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            _scaleMode == VideoScaleMode.fit
+                                ? 'Mode: Fit (Asli)'
+                                : _scaleMode == VideoScaleMode.zoom
+                                    ? 'Mode: Zoom (Penuhi Layar)'
+                                    : 'Mode: Stretch (Regangkan)',
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontFamily: 'Outfit',
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          duration: const Duration(seconds: 1),
+                          behavior: SnackBarBehavior.floating,
+                          width: 250,
+                          backgroundColor: AppColors.surface.withOpacity(0.9),
+                        ),
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
