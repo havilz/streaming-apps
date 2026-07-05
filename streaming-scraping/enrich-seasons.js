@@ -186,6 +186,21 @@ function parseSlug(slug) {
   return { title, year };
 }
 
+function isTitleMatch(searchTitle, tmdbName, tmdbOriginalName) {
+  const clean = (s) => {
+    if (!s) return '';
+    return s.normalize('NFD') // Hapus aksen (diacritics)
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/&/g, 'and') // Ubah & menjadi and
+      .replace(/[^a-z0-9]/g, '') // Hapus semua karakter lain
+      .trim();
+  };
+  const target = clean(searchTitle);
+  if (!target) return false;
+  return clean(tmdbName) === target || (tmdbOriginalName && clean(tmdbOriginalName) === target);
+}
+
 async function searchTmdbBySlug(slug) {
   const { title, year } = parseSlug(slug);
   try {
@@ -202,8 +217,13 @@ async function searchTmdbBySlug(slug) {
     );
     if (!res.ok) return null;
     const data = await res.json();
-    const first = data.results?.[0];
-    return first ? first.id : null; // kembalikan TMDB ID
+    const results = data.results || [];
+    for (const item of results) {
+      if (isTitleMatch(title, item.name, item.original_name)) {
+        return item.id;
+      }
+    }
+    return null;
   } catch {
     return null;
   }
