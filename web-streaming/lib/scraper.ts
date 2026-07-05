@@ -317,19 +317,54 @@ export async function fetchPlayInfo(
   isMovie: boolean = false
 ): Promise<PlayInfoResponse | null> {
   const headers = createBrowserHeaders();
-  
+  let activeEpisodeId = episodeId;
+
+  if (!isMovie && episodeId.startsWith("tmdb-")) {
+    const match = episodeId.match(/s(\d+)e(\d+)$/);
+    if (match) {
+      const seasonNumber = match[1];
+      const episodeNumber = parseInt(match[2]);
+      console.log(`[scraper] TMDB fallback episode ID detected: ${episodeId}. Resolving IDLIX ID for season ${seasonNumber}, episode ${episodeNumber}...`);
+      try {
+        const episodesRes = await gotScraping({
+          url: `${BASE_URL}/api/series/${slug}/season/${seasonNumber}`,
+          headers: createBrowserHeaders(),
+          useHeaderGenerator: false,
+        });
+        if (episodesRes.statusCode === 200) {
+          const episodesData = JSON.parse(episodesRes.body);
+          const episodesList = episodesData.season?.episodes || [];
+          const matchedEpisode = episodesList.find((ep: any) => ep.episodeNumber === episodeNumber);
+          if (matchedEpisode && matchedEpisode.id) {
+            console.log(`[scraper] Successfully resolved IDLIX episode ID: ${matchedEpisode.id}`);
+            activeEpisodeId = matchedEpisode.id;
+          } else {
+            console.error(`[scraper] Episode ${episodeNumber} not found on IDLIX for ${slug} S${seasonNumber}`);
+            return null;
+          }
+        } else {
+          console.error(`[scraper] Failed to fetch IDLIX episodes for ${slug} S${seasonNumber}: Status ${episodesRes.statusCode}`);
+          return null;
+        }
+      } catch (err: any) {
+        console.error(`[scraper] Error resolving IDLIX episode ID:`, err.message);
+        return null;
+      }
+    }
+  }
+
   // Construct a realistic referer URL
   const refererUrl = isMovie
     ? `${BASE_URL}/movie/${slug}`
     : `${BASE_URL}/series/${slug}/season/1/episode/1`;
 
   const playInfoUrl = isMovie
-    ? `${BASE_URL}/api/watch/play-info/movie/${episodeId}`
-    : `${BASE_URL}/api/watch/play-info/episode/${episodeId}`;
+    ? `${BASE_URL}/api/watch/play-info/movie/${activeEpisodeId}`
+    : `${BASE_URL}/api/watch/play-info/episode/${activeEpisodeId}`;
 
   try {
     // Step 1: Request gate token
-    console.log(`[scraper] Step 1: Requesting gate token for ${episodeId}...`);
+    console.log(`[scraper] Step 1: Requesting gate token for ${activeEpisodeId}...`);
     const res1 = await gotScraping({
       url: playInfoUrl,
       headers: {
@@ -378,7 +413,7 @@ export async function fetchPlayInfo(
     await new Promise((resolve) => setTimeout(resolve, waitMs));
 
     // Step 3: POST to session claim
-    console.log(`[scraper] Step 2: Claiming session for ${episodeId}...`);
+    console.log(`[scraper] Step 2: Claiming session for ${activeEpisodeId}...`);
     const claimUrl = `${BASE_URL}/api/watch/session/claim`;
     const res2 = await gotScraping({
       url: claimUrl,
