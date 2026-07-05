@@ -169,22 +169,11 @@ async function runWorker() {
   }
   console.log('');
 
-  // --- Cek status setelah pembersihan ---
-  const initial = await getCountRemaining();
-  console.log('📊 Status Pekerjaan:');
-  console.log(`   - Film belum ter-enrich : ${initial.movies} film`);
-  console.log(`   - Series belum lengkap  : ${initial.seriesMetadata} series`);
-  console.log('');
-
-  if (initial.movies === 0 && initial.seriesMetadata === 0) {
-    console.log('🎉 Semua data sudah lengkap! Worker masuk ke mode siaga.');
-    console.log(`   Total waktu: ${formatDuration(Date.now() - startTime)}`);
-    console.log('💤 Pekerjaan selesai. Menghindari restart Railway dengan tidur selamanya...');
-    setInterval(() => {
-      console.log(`[IDLE] Worker dalam mode siaga - ${now()}`);
-    }, 1000 * 60 * 60 * 12);
-    return;
-  }
+  console.log('🎉 TAHAP 0 Selesai. Masuk ke mode siaga (IDLE) agar tidak restart loop...');
+  setInterval(() => {
+    console.log(`[IDLE] Worker dalam mode siaga - ${now()}`);
+  }, 1000 * 60 * 60 * 12);
+  return;
 
   // ==========================================
   // TAHAP 1: ENRICH MOVIES (via TMDB API)

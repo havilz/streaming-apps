@@ -92,15 +92,15 @@ async function main() {
   let series = [];
   let page = 0;
   const pageSize = 1000;
-  
+
   while (true) {
     const start = page * pageSize;
     const end = start + pageSize - 1;
     log(`Fetching page ${page + 1} (range ${start}-${end})...`);
     const pageSeries = await supabaseRequest(
-      'GET', 
-      'series?tmdb_id=not.is.null&select=id,slug,title,tmdb_id', 
-      null, 
+      'GET',
+      'series?tmdb_id=not.is.null&select=id,slug,title,tmdb_id',
+      null,
       { 'Range': `${start}-${end}` }
     );
     if (!pageSeries || pageSeries.length === 0) break;
