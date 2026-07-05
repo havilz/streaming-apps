@@ -136,7 +136,8 @@ async function fetchTmdbDetail(tmdbId) {
         'Accept': 'application/json',
       },
     });
-    if (!res.ok) return null;
+    if (res.status === 404) return false; // TV show deleted or wrong ID
+    if (!res.ok) return null; // API error
     return await res.json();
   } catch {
     return null;
@@ -215,7 +216,10 @@ async function searchTmdbBySlug(slug) {
         },
       },
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`⚠️ TMDB API returned status ${res.status} for search`);
+      return null; // API error, retry next time
+    }
     const data = await res.json();
     const results = data.results || [];
     for (const item of results) {
@@ -223,9 +227,10 @@ async function searchTmdbBySlug(slug) {
         return item.id;
       }
     }
-    return null;
-  } catch {
-    return null;
+    return false; // Searched successfully, but NOT found on TMDB
+  } catch (err) {
+    console.warn(`⚠️ TMDB search request failed: ${err.message}`);
+    return null; // Network/fetch error, retry next time
   }
 }
 
@@ -312,20 +317,41 @@ async function main() {
         // Jika tidak ada tmdb_id di DB, cari via TMDB Search
         if (!tmdbId) {
           console.log(`   🔍 Tidak ada tmdb_id, mencari di TMDB via slug: ${series.slug}...`);
-          tmdbId = await searchTmdbBySlug(series.slug);
-          if (!tmdbId) {
-            console.log(`   ⚠️ Tidak ditemukan di TMDB → dilewati.`);
+          const searchResult = await searchTmdbBySlug(series.slug);
+          if (searchResult === false) {
+            console.log(`   ⚠️ Tidak ditemukan di TMDB → tandai sebagai skipped.`);
+            await supabaseRequest('PATCH', `series?id=eq.${series.id}`, {
+              status: 'skipped',
+              number_of_seasons: 0,
+              overview: '[Sinopsis tidak ditemukan di TMDB/IDLIX]'
+            });
+            failed++;
+            await sleep(300);
+            continue;
+          } else if (searchResult === null) {
+            console.log(`   ⚠️ Gagal melakukan pencarian di TMDB (error/rate limit) → lewati ronde ini.`);
             failed++;
             await sleep(300);
             continue;
           }
+          tmdbId = searchResult;
           console.log(`   ✅ Ditemukan tmdb_id: ${tmdbId}`);
         }
 
         console.log(`   ℹ️ IDLIX tidak ditemukan, fallback ke TMDB (id: ${tmdbId})...`);
         const tmdbDetail = await fetchTmdbDetail(tmdbId);
-        if (!tmdbDetail) {
-          console.log(`   ⚠️ TMDB juga tidak ditemukan → dilewati.`);
+        if (tmdbDetail === false) {
+          console.log(`   ⚠️ TMDB ID ${tmdbId} tidak ditemukan (404) → tandai sebagai skipped.`);
+          await supabaseRequest('PATCH', `series?id=eq.${series.id}`, {
+            status: 'skipped',
+            number_of_seasons: 0,
+            overview: '[TMDB ID tidak valid atau telah dihapus]'
+          });
+          failed++;
+          await sleep(300);
+          continue;
+        } else if (tmdbDetail === null) {
+          console.log(`   ⚠️ Gagal mengambil detail dari TMDB → lewati ronde ini.`);
           failed++;
           await sleep(300);
           continue;
