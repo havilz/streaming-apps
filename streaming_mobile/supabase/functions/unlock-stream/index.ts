@@ -51,13 +51,45 @@ function extractCookies(headers: Headers): string {
 }
 
 async function unlockStream(episodeId: string, slug: string, isMovie: boolean) {
+  let activeEpisodeId = episodeId;
+
+  if (!isMovie && episodeId.startsWith("tmdb-")) {
+    const match = episodeId.match(/s(\d+)e(\d+)$/);
+    if (match) {
+      const seasonNumber = match[1];
+      const episodeNumber = parseInt(match[2]);
+      console.log(`[unlock-stream] TMDB fallback episode ID detected: ${episodeId}. Resolving IDLIX ID for season ${seasonNumber}, episode ${episodeNumber}...`);
+      try {
+        const url = `${BASE_URL}/api/series/${slug}/season/${seasonNumber}`;
+        const episodesRes = await fetch(url, {
+          headers: BROWSER_HEADERS,
+        });
+        if (episodesRes.ok) {
+          const episodesData = await episodesRes.json();
+          const episodesList = episodesData.season?.episodes || [];
+          const matchedEpisode = episodesList.find((ep: any) => ep.episodeNumber === episodeNumber);
+          if (matchedEpisode && matchedEpisode.id) {
+            console.log(`[unlock-stream] Successfully resolved IDLIX episode ID: ${matchedEpisode.id}`);
+            activeEpisodeId = matchedEpisode.id;
+          } else {
+            throw new Error(`Episode ${episodeNumber} not found on IDLIX for ${slug} S${seasonNumber}`);
+          }
+        } else {
+          throw new Error(`Failed to fetch IDLIX episodes for ${slug} S${seasonNumber}: Status ${episodesRes.status}`);
+        }
+      } catch (err: any) {
+        throw new Error(`Error resolving IDLIX episode ID: ${err.message}`);
+      }
+    }
+  }
+
   const referer = isMovie
     ? `${BASE_URL}/movie/${slug}`
     : `${BASE_URL}/series/${slug}/season/1/episode/1`;
 
   const playInfoUrl = isMovie
-    ? `${BASE_URL}/api/watch/play-info/movie/${episodeId}`
-    : `${BASE_URL}/api/watch/play-info/episode/${episodeId}`;
+    ? `${BASE_URL}/api/watch/play-info/movie/${activeEpisodeId}`
+    : `${BASE_URL}/api/watch/play-info/episode/${activeEpisodeId}`;
 
   // Step 1: Gate token
   const res1 = await fetch(playInfoUrl, {
