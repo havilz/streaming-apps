@@ -607,7 +607,7 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
                       borderRadius: BorderRadius.circular(6.0),
                     ),
                     child: Text(
-                      subtitle.text,
+                      subtitle,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 16.0,
