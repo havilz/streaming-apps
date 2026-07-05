@@ -9,30 +9,6 @@ import 'package:streaming_mobile/core/core.dart';
 import 'package:streaming_mobile/features/detail/data/data.dart';
 import 'package:streaming_mobile/features/detail/domain/detail_provider.dart';
 import 'package:streaming_mobile/shared/shared.dart';
-import 'dart:async';
-
-class MutableChewieController extends ChewieController {
-  MutableChewieController({
-    required super.videoPlayerController,
-    super.aspectRatio,
-    super.autoPlay,
-    super.looping,
-    super.allowFullScreen,
-    super.allowMuting,
-    super.showControls,
-    super.materialProgressColors,
-    super.routePageBuilder,
-  });
-
-  double? _customAspectRatio;
-
-  @override
-  double? get aspectRatio => _customAspectRatio ?? super.aspectRatio;
-
-  set customAspectRatio(double? val) {
-    _customAspectRatio = val;
-  }
-}
 
 class EpisodeDetailScreen extends ConsumerStatefulWidget {
   const EpisodeDetailScreen({
@@ -502,7 +478,7 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
     );
     await _videoController!.initialize();
 
-    _chewieController = MutableChewieController(
+    _chewieController = ChewieController(
       videoPlayerController: _videoController!,
       autoPlay: true,
       looping: false,
@@ -515,11 +491,6 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
         bufferedColor: AppColors.primaryGlow,
         backgroundColor: AppColors.surface,
       ),
-      routePageBuilder: (context, animation, secondaryAnimation, controllerProvider) {
-        return CustomChewieFullscreenPage(
-          controller: controllerProvider.controller,
-        );
-      },
     );
 
     if (mounted) setState(() {});
@@ -741,131 +712,6 @@ class _ErrorBody extends StatelessWidget {
               child: const Text(
                 'Kembali',
                 style: TextStyle(color: AppColors.primary),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class CustomChewieFullscreenPage extends StatefulWidget {
-  const CustomChewieFullscreenPage({
-    super.key,
-    required this.controller,
-  });
-
-  final ChewieController controller;
-
-  @override
-  State<CustomChewieFullscreenPage> createState() =>
-      _CustomChewieFullscreenPageState();
-}
-
-class _CustomChewieFullscreenPageState
-    extends State<CustomChewieFullscreenPage> {
-  bool _isZoomFit = false;
-  bool _areControlsVisible = true;
-  Timer? _controlsTimer;
-
-  void _onUserInteraction() {
-    if (!mounted) return;
-    setState(() {
-      _areControlsVisible = true;
-    });
-    _controlsTimer?.cancel();
-    _controlsTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) {
-        final isPlaying = widget.controller.videoPlayerController.value.isPlaying;
-        if (isPlaying) {
-          setState(() {
-            _areControlsVisible = false;
-          });
-        }
-      }
-    });
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _onUserInteraction();
-  }
-
-  @override
-  void dispose() {
-    _controlsTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final videoController = widget.controller.videoPlayerController;
-
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Listener(
-        onPointerDown: (_) => _onUserInteraction(),
-        onPointerMove: (_) => _onUserInteraction(),
-        child: Stack(
-          children: [
-            Center(
-              child: SizedBox.expand(
-                child: ChewieControllerProvider(
-                  controller: widget.controller,
-                  child: Chewie(
-                    key: ValueKey(_isZoomFit),
-                    controller: widget.controller,
-                  ),
-                ),
-              ),
-            ),
-            // Buffer Indicator
-            ValueListenableBuilder(
-              valueListenable: videoController,
-              builder: (context, VideoPlayerValue value, child) {
-                if (value.isBuffering) {
-                  return const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.primary,
-                    ),
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
-            // Zoom Toggle Button
-            Positioned(
-              top: 12,
-              right: 60, // Samping tombol opsi (titik tiga)
-              child: AnimatedOpacity(
-                opacity: _areControlsVisible ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 300),
-                child: IgnorePointer(
-                  ignoring: !_areControlsVisible,
-                  child: IconButton(
-                    iconSize: 24,
-                    icon: Icon(
-                      _isZoomFit
-                          ? Icons.zoom_in_map_rounded
-                          : Icons.zoom_out_map_rounded,
-                      color: Colors.white,
-                    ),
-                    onPressed: () {
-                      _onUserInteraction();
-                      setState(() {
-                        _isZoomFit = !_isZoomFit;
-                        final videoRatio = videoController.value.aspectRatio;
-                        final screenRatio = MediaQuery.of(context).size.aspectRatio;
-                        if (widget.controller is MutableChewieController) {
-                          (widget.controller as MutableChewieController).customAspectRatio =
-                              _isZoomFit ? screenRatio : videoRatio;
-                        }
-                      });
-                    },
-                  ),
-                ),
               ),
             ),
           ],
