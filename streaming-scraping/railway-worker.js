@@ -136,19 +136,54 @@ async function runWorker() {
   console.log('');
 
   const startTime = Date.now();
-  let round = 0;
+  const { default: { spawn } } = await import('child_process');
 
-  // --- Cek status awal ---
+  // ==========================================
+  // TAHAP 0: BERSIHKAN DATA TMDB YANG KORUP (via find_corrupted_tmdb.js)
+  // ==========================================
+  console.log('═══════════════════════════════════════════════════════');
+  console.log(`🧹 TAHAP 0: Pemeriksaan dan Pembersihan Data TMDB Korup`);
+  console.log('═══════════════════════════════════════════════════════');
+  console.log('');
+
+  try {
+    await new Promise((resolve, reject) => {
+      const child = spawn(
+        process.execPath,
+        ['find_corrupted_tmdb.js'],
+        {
+          cwd: __dirname,
+          stdio: 'inherit',
+          env: process.env,
+        }
+      );
+      child.on('close', (code) => {
+        if (code === 0 || code === null) resolve();
+        else reject(new Error(`find_corrupted_tmdb.js exited with code ${code}`));
+      });
+      child.on('error', reject);
+    });
+    console.log('\n✓ TAHAP 0 Selesai.');
+  } catch (err) {
+    console.warn(`⚠️  Gagal menjalankan pembersihan korupsi TMDB: ${err.message}`);
+  }
+  console.log('');
+
+  // --- Cek status setelah pembersihan ---
   const initial = await getCountRemaining();
-  console.log(`📊 Status Awal:`);
+  console.log('📊 Status Pekerjaan:');
   console.log(`   - Film belum ter-enrich : ${initial.movies} film`);
   console.log(`   - Series belum lengkap  : ${initial.seriesMetadata} series`);
   console.log('');
 
   if (initial.movies === 0 && initial.seriesMetadata === 0) {
-    console.log('🎉 Semua data sudah lengkap! Worker tidak perlu bekerja.');
+    console.log('🎉 Semua data sudah lengkap! Worker masuk ke mode siaga.');
     console.log(`   Total waktu: ${formatDuration(Date.now() - startTime)}`);
-    process.exit(0);
+    console.log('💤 Pekerjaan selesai. Menghindari restart Railway dengan tidur selamanya...');
+    setInterval(() => {
+      console.log(`[IDLE] Worker dalam mode siaga - ${now()}`);
+    }, 1000 * 60 * 60 * 12);
+    return;
   }
 
   // ==========================================
@@ -168,12 +203,9 @@ async function runWorker() {
       movieRound++;
       console.log(`[MOVIES Ronde ${movieRound}] ${now()} — Mulai batch ${BATCH_SIZE} film...`);
 
-      // Jalankan enrich-details.js sebagai child process dengan spawn
-      const { default: { spawn } } = await import('child_process');
-
       await new Promise((resolve, reject) => {
         const child = spawn(
-          process.execPath, // path ke node.exe
+          process.execPath,
           ['enrich-details.js', '--type', 'movies', '--limit', String(BATCH_SIZE), '--delay', '350'],
           {
             cwd: __dirname,
@@ -188,7 +220,6 @@ async function runWorker() {
         child.on('error', reject);
       });
 
-      // Cek sisa film setelah batch
       const remaining = await getCountRemaining();
       totalMoviesProcessed = initial.movies - remaining.movies;
       console.log(`\n   ✓ Sisa film: ${remaining.movies} | Progress: ${totalMoviesProcessed}/${initial.movies} (${((totalMoviesProcessed/initial.movies)*100).toFixed(1)}%)`);
@@ -200,7 +231,6 @@ async function runWorker() {
         break;
       }
 
-      // Jeda kecil sebelum batch berikutnya
       console.log(`   ⏳ Jeda ${DELAY_BETWEEN_ROUNDS_MS / 1000} detik sebelum batch berikutnya...`);
       await sleep(DELAY_BETWEEN_ROUNDS_MS);
     }
@@ -225,8 +255,6 @@ async function runWorker() {
     while (true) {
       seriesRound++;
       console.log(`[SERIES Ronde ${seriesRound}] ${now()} — Mulai pengisian series...`);
-
-      const { default: { spawn } } = await import('child_process');
 
       let exitCode = 0;
       await new Promise((resolve) => {
@@ -255,7 +283,6 @@ async function runWorker() {
         break;
       }
 
-      // Deteksi error beruntun (kemungkinan Cloudflare blocking)
       if (exitCode !== 0) {
         consecutiveFail++;
         console.warn(`⚠️  Gagal ${consecutiveFail}x berturut-turut (mungkin terblokir Cloudflare).`);
@@ -264,7 +291,6 @@ async function runWorker() {
           console.error('   Coba jalankan enrich-seasons.js dari komputer lokal Anda.');
           break;
         }
-        // Jeda lebih lama setelah gagal
         const backoff = 60_000 * consecutiveFail;
         console.log(`   ⏳ Menunggu ${backoff / 1000} detik sebelum mencoba lagi...`);
         await sleep(backoff);
@@ -300,7 +326,11 @@ async function runWorker() {
     '✅ Stream Vault — Selesai!',
     `Semua data berhasil diisi!\nTotal waktu: ${formatDuration(elapsed)}\nSelesai: ${now()}`
   );
-  process.exit(0);
+
+  console.log('💤 Pekerjaan selesai. Menghindari restart Railway dengan tidur selamanya...');
+  setInterval(() => {
+    console.log(`[IDLE] Worker dalam mode siaga - ${now()}`);
+  }, 1000 * 60 * 60 * 12);
 }
 
 runWorker().catch(async err => {
@@ -310,5 +340,8 @@ runWorker().catch(async err => {
     `Terjadi error fatal:\n${err.message}\n\nCek log Railway untuk detail.`,
     true
   );
-  process.exit(1);
+  console.log('💤 Menghindari restart Railway akibat error dengan tidur selamanya...');
+  setInterval(() => {
+    console.log(`[IDLE-ERROR] Worker dalam mode siaga setelah error - ${now()}`);
+  }, 1000 * 60 * 60 * 12);
 });
