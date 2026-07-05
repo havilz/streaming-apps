@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,8 +10,8 @@ import 'package:streaming_mobile/features/detail/data/stream_result.dart';
 import 'package:streaming_mobile/features/detail/domain/detail_provider.dart';
 import 'package:streaming_mobile/shared/atoms/app_text.dart';
 import 'package:video_player/video_player.dart';
-import 'package:chewie/chewie.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:streaming_mobile/shared/molecules/custom_video_player.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({
@@ -30,7 +31,8 @@ class PlayerScreen extends ConsumerStatefulWidget {
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   VideoPlayerController? _videoController;
-  ChewieController? _chewieController;
+  List<PlayerSubtitle>? _subtitles;
+  SubtitleTrack? _currentSubtitleTrack;
 
   @override
   void initState() {
@@ -57,89 +59,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     WakelockPlus.disable();
-    _chewieController?.dispose();
     _videoController?.dispose();
     super.dispose();
-  }
-
-  Duration _parseVttDuration(String s) {
-    final parts = s.split(':');
-    if (parts.length == 3) {
-      final hours = int.parse(parts[0]);
-      final minutes = int.parse(parts[1]);
-      final secondsParts = parts[2].split('.');
-      final seconds = int.parse(secondsParts[0]);
-      final milliseconds = int.parse(secondsParts[1].padRight(3, '0').substring(0, 3));
-      return Duration(hours: hours, minutes: minutes, seconds: seconds, milliseconds: milliseconds);
-    } else if (parts.length == 2) {
-      final minutes = int.parse(parts[0]);
-      final secondsParts = parts[1].split('.');
-      final seconds = int.parse(secondsParts[0]);
-      final milliseconds = int.parse(secondsParts[1].padRight(3, '0').substring(0, 3));
-      return Duration(minutes: minutes, seconds: seconds, milliseconds: milliseconds);
-    }
-    throw FormatException("Invalid VTT duration: $s");
-  }
-
-  Subtitles _parseVtt(String vttContent) {
-    final List<Subtitle> list = [];
-    final lines = vttContent.replaceAll('\r\n', '\n').split('\n');
-
-    int index = 0;
-    String? timestampLine;
-    final List<String> textLines = [];
-
-    for (var line in lines) {
-      final trimmed = line.trim();
-      if (trimmed.isEmpty) {
-        if (timestampLine != null && textLines.isNotEmpty) {
-          try {
-            final times = timestampLine.split('-->');
-            if (times.length == 2) {
-              final start = _parseVttDuration(times[0].trim());
-              final end = _parseVttDuration(times[1].trim());
-              list.add(Subtitle(
-                index: index++,
-                start: start,
-                end: end,
-                text: textLines.join('\n'),
-              ));
-            }
-          } catch (_) {}
-          timestampLine = null;
-          textLines.clear();
-        }
-        continue;
-      }
-
-      if (trimmed.startsWith('WEBVTT') || trimmed.startsWith('NOTE')) {
-        continue;
-      }
-
-      if (trimmed.contains('-->')) {
-        timestampLine = trimmed;
-      } else if (timestampLine != null) {
-        textLines.add(trimmed);
-      }
-    }
-
-    if (timestampLine != null && textLines.isNotEmpty) {
-      try {
-        final times = timestampLine.split('-->');
-        if (times.length == 2) {
-          final start = _parseVttDuration(times[0].trim());
-          final end = _parseVttDuration(times[1].trim());
-          list.add(Subtitle(
-            index: index++,
-            start: start,
-            end: end,
-            text: textLines.join('\n'),
-          ));
-        }
-      } catch (_) {}
-    }
-
-    return Subtitles(list);
   }
 
   Future<String?> _fetchUrl(String url) async {
@@ -168,60 +89,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     );
     await _videoController!.initialize();
 
-    Subtitles? parsedSubtitles;
+    List<PlayerSubtitle>? parsedSubtitles;
+    SubtitleTrack? selectedTrack;
     if (subtitleTracks != null && subtitleTracks.isNotEmpty) {
-      final track = subtitleTracks.firstWhere(
+      selectedTrack = subtitleTracks.firstWhere(
         (t) => t.lang.toLowerCase() == 'id' || t.label.toLowerCase().contains('indo'),
         orElse: () => subtitleTracks.first,
       );
-      final vttContent = await _fetchUrl(track.path);
+      final vttContent = await _fetchUrl(selectedTrack.path);
       if (vttContent != null) {
-        parsedSubtitles = _parseVtt(vttContent);
+        parsedSubtitles = CustomVideoPlayer.parseVtt(vttContent);
       }
     }
 
-    _chewieController = ChewieController(
-      videoPlayerController: _videoController!,
-      autoPlay: true,
-      looping: false,
-      allowFullScreen: true,
-      allowMuting: true,
-      showControls: true,
-      subtitle: parsedSubtitles,
-      subtitleBuilder: parsedSubtitles != null
-          ? (context, subtitle) => Positioned(
-                bottom: 25,
-                left: 20,
-                right: 20,
-                child: Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.75),
-                      borderRadius: BorderRadius.circular(6.0),
-                    ),
-                    child: Text(
-                      subtitle,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16.0,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                ),
-              )
-          : null,
-      materialProgressColors: ChewieProgressColors(
-        playedColor: AppColors.primary,
-        handleColor: AppColors.primary,
-        bufferedColor: AppColors.primaryGlow,
-        backgroundColor: AppColors.surface,
-      ),
-    );
-
-    if (mounted) setState(() {});
+    if (mounted) {
+      setState(() {
+        _subtitles = parsedSubtitles;
+        _currentSubtitleTrack = selectedTrack;
+      });
+    }
   }
 
   @override
@@ -234,49 +120,41 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       }
     });
 
+    final displayTitle = widget.slug
+        .replaceAll('-', ' ')
+        .split(' ')
+        .map((s) => s.isNotEmpty ? s[0].toUpperCase() + s.substring(1) : '')
+        .join(' ');
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(
         children: [
           // ── Video Player ──
-          if (_chewieController != null)
-            Center(
-              child: SizedBox.expand(
-                child: Stack(
-                  children: [
-                    // Ambient glow merah
-                    const DecoratedBox(
-                      decoration: BoxDecoration(
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primaryGlow,
-                            blurRadius: 60,
-                            spreadRadius: 10,
-                          ),
-                        ],
-                      ),
-                    ),
-                    Chewie(controller: _chewieController!),
-                    ValueListenableBuilder(
-                      valueListenable: _videoController!,
-                      builder: (context, VideoPlayerValue value, child) {
-                        if (value.isBuffering) {
-                          return const Center(
-                            child: CircularProgressIndicator(
-                              color: AppColors.primary,
-                            ),
-                          );
-                        }
-                        return const SizedBox.shrink();
-                      },
-                    ),
-                  ],
-                ),
-              ),
+          if (_videoController != null && _videoController!.value.isInitialized)
+            CustomVideoPlayer(
+              controller: _videoController!,
+              title: displayTitle,
+              subtitles: _subtitles,
+              subtitleTracks: streamState.result?.subtitles,
+              currentSubtitleTrack: _currentSubtitleTrack,
+              onSubtitleTrackChanged: (track) async {
+                setState(() {
+                  _currentSubtitleTrack = track;
+                  _subtitles = null;
+                });
+                final vttContent = await _fetchUrl(track.path);
+                if (vttContent != null) {
+                  setState(() {
+                    _subtitles = CustomVideoPlayer.parseVtt(vttContent);
+                  });
+                }
+              },
+              onBack: () => context.pop(),
             ),
 
           // ── Loading / Countdown Screen ──
-          if (!streamState.hasResult && _chewieController == null)
+          if (!streamState.hasResult && (_videoController == null || !_videoController!.value.isInitialized))
             _CountdownOverlay(
               streamState: streamState,
               onBack: () => context.pop(),
