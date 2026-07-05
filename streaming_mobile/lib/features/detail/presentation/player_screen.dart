@@ -185,7 +185,10 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
                           ],
                         ),
                       ),
-                      Chewie(controller: _chewieController!),
+                      Chewie(
+                        key: ValueKey(_isZoomFit),
+                        controller: _chewieController!,
+                      ),
                       ValueListenableBuilder(
                         valueListenable: _videoController!,
                         builder: (context, VideoPlayerValue value, child) {

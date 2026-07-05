@@ -814,7 +814,10 @@ class _CustomChewieFullscreenPageState
               child: SizedBox.expand(
                 child: ChewieControllerProvider(
                   controller: widget.controller,
-                  child: Chewie(controller: widget.controller),
+                  child: Chewie(
+                    key: ValueKey(_isZoomFit),
+                    controller: widget.controller,
+                  ),
                 ),
               ),
             ),
