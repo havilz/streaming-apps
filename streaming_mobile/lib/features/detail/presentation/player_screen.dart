@@ -148,9 +148,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             ),
         ],
       ),
-    ),
-  );
-}
+    );
+  }
 }
 
 // ── Countdown overlay saat proses unlock berlangsung ─────────
