@@ -17,7 +17,7 @@ class HomeRepository {
     var query = supabaseClient
         .from(ApiEndpoints.movies)
         .select(
-          'id, title, slug, poster_path, backdrop_path, overview, release_date, vote_average, quality, movie_genres(genres(name)), movie_countries(countries(name))',
+          'id, title, slug, poster_path, backdrop_path, overview, release_date, vote_average, quality, created_at, movie_genres(genres(name)), movie_countries(countries(name))',
         );
 
     if (year != null) {
@@ -45,7 +45,7 @@ class HomeRepository {
     var query = supabaseClient
         .from(ApiEndpoints.series)
         .select(
-          'id, title, slug, poster_path, backdrop_path, overview, first_air_date, vote_average, quality, series_genres(genres(name)), series_networks(networks(name)), series_countries(countries(name))',
+          'id, title, slug, poster_path, backdrop_path, overview, first_air_date, vote_average, quality, created_at, series_genres(genres(name)), series_networks(networks(name)), series_countries(countries(name))',
         );
 
     if (year != null) {
@@ -347,5 +347,18 @@ class HomeRepository {
         .limit(limit);
 
     return (data as List).map((e) => SeriesModel.fromMap(e)).toList();
+  }
+
+  /// Ambil daftar episode terbaru beserta data series-nya.
+  Future<List<UpdatedItem>> fetchNewestEpisodes({int limit = 15}) async {
+    final data = await supabaseClient
+        .from('episodes')
+        .select(
+          'id, season_number, episode_number, title, still_path, created_at, series:series_id(title, slug, poster_path, backdrop_path, vote_average)',
+        )
+        .order('created_at', ascending: false)
+        .limit(limit);
+
+    return (data as List).map((e) => UpdatedItem.fromEpisodeMap(e as Map<String, dynamic>)).toList();
   }
 }

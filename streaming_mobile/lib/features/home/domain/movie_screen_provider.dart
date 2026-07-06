@@ -6,6 +6,7 @@ class MovieScreenState {
   const MovieScreenState({
     this.heroItems = const [],
     this.trendingItems = const [],
+    this.newUpdatedItems = const [],
     this.genreItems = const {},
     this.countryItems = const {},
     this.isLoading = false,
@@ -14,6 +15,7 @@ class MovieScreenState {
 
   final List<ContentItem> heroItems;
   final List<ContentItem> trendingItems;
+  final List<UpdatedItem> newUpdatedItems;
   final Map<String, List<ContentItem>> genreItems;
   final Map<String, List<ContentItem>> countryItems;
   final bool isLoading;
@@ -22,6 +24,7 @@ class MovieScreenState {
   MovieScreenState copyWith({
     List<ContentItem>? heroItems,
     List<ContentItem>? trendingItems,
+    List<UpdatedItem>? newUpdatedItems,
     Map<String, List<ContentItem>>? genreItems,
     Map<String, List<ContentItem>>? countryItems,
     bool? isLoading,
@@ -29,6 +32,7 @@ class MovieScreenState {
   }) => MovieScreenState(
     heroItems: heroItems ?? this.heroItems,
     trendingItems: trendingItems ?? this.trendingItems,
+    newUpdatedItems: newUpdatedItems ?? this.newUpdatedItems,
     genreItems: genreItems ?? this.genreItems,
     countryItems: countryItems ?? this.countryItems,
     isLoading: isLoading ?? this.isLoading,
@@ -105,9 +109,14 @@ class MovieScreenNotifier extends Notifier<MovieScreenState> {
         }
       }
 
+      // 5. Fetch newest movies for New Updated
+      final newMovies = await _repo.fetchMovies(page: 0, limit: 15);
+      final newUpdated = newMovies.map((m) => UpdatedItem.fromMovie(m, createdAt: m.createdAt)).toList();
+
       state = MovieScreenState(
         heroItems: heroItems,
         trendingItems: trending,
+        newUpdatedItems: newUpdated,
         genreItems: filteredGenreMap,
         countryItems: countryMap,
         isLoading: false,

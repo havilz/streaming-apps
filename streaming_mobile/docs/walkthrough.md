@@ -391,4 +391,44 @@ Semua dokumen perancangan awal dibuat di folder `docs/`:
 
 ---
 
+## Checkpoint 12 — Queue Sync Optimization & Auto-alignment
+**Status:** ✅ Selesai
+
+**Yang dikerjakan:**
+- **Pemberantasan Head-of-Line Blocking pada Antrean Sync:**
+  - Mengubah fungsi `syncOngoing` di Edge Function `sync-content` untuk menambahkan `.order('updated_at', { ascending: true })` sehingga antrean berjalan secara FIFO (First In First Out) memutar, bukan stuck pada 10 baris data fisik yang sama.
+  - Implementasi "Touch" logic pada penanganan error fetch: Jika detail series gagal di-fetch dari IDLIX (misalnya slug usang / 404), baris series tersebut akan di-update statusnya di database untuk memperbarui kolom `updated_at` (menempatkannya di belakang antrean sehingga tidak menyumbat antrean selamanya).
+  - Meningkatkan kapasitas batch per jalan dari 10 menjadi 15 series.
+- **Penyelarasan Jumlah Season Otomatis (Auto-alignment):**
+  - Mengintegrasikan penghitungan `maxSeasonWithEpisodes` ke dalam Edge Function `syncOngoing` (mengecualikan season Specials / Season 0) agar pembaharuan jumlah season pada metadata series di database selalu selaras secara otomatis di masa mendatang.
+
+**Keputusan teknis:**
+- Penggunaan pengurutan `updated_at` asinkron dan touch logic untuk menjamin putaran antrean (rotating queue) yang sehat dan tangguh di database.
+- Sinkronisasi jumlah season regular secara dinamis berdasarkan data episode nyata yang berhasil di-scrape.
+
+---
+
+## Checkpoint 13 — New Updated Section with Interactive Filtering & Navigation
+**Status:** ✅ Selesai
+
+**Yang dikerjakan:**
+- **Penyajian Seksi "New Updated" Dinamis:**
+  - Menambahkan seksi "New Updated" di bagian terbawah `HomeScreen`, `MovieScreen`, dan `SeriesScreen` untuk menyajikan konten yang baru saja ditambahkan (film baru, serial baru, dan episode terbaru dari serial yang sudah ada).
+- **Filter Interaktif Tersemat:**
+  - Melengkapi seksi dengan baris filter dinamis:
+    - `HomeScreen` (All, Movie, Series, Episode)
+    - `SeriesScreen` (All, Series, Episode)
+    - `MovieScreen` (Menampilkan film terbaru tanpa filter karena jenis konten tunggal)
+- **Desain Kartu & Label Khusus:**
+  - Memperluas kartu poster `MovieCard` dengan properti `customBadge` untuk menampilkan teks spesifik secara fleksibel (seperti kode episode "S4E13" untuk episode terbaru, atau "Movie"/"Series" untuk konten baru).
+- **Rute Navigasi Langsung (Episode Detail):**
+  - Mengarahkan penekanan kartu berjenis episode langsung ke detail episode (`EpisodeDetailScreen`), sedangkan film dan series diarahkan ke halaman detail utama masing-masing (`DetailScreen`).
+
+**Keputusan teknis:**
+- Pengambilan data parallel menggunakan kueri join `series:series_id(title, slug, ...)` pada PostgREST untuk meminimalkan beban kueri dan mempercepat sinkronisasi data visual.
+- Pengurutan terpadu (merged sorting) di memori menggunakan properti `created_at` secara descending untuk menjamin urutan kronologis yang akurat.
+
+---
+
 > Dokumen ini mencatat riwayat pengerjaan, kendala teknis penting, dan alur pengerjaan. Seluruh tugas dalam daftar telah diselesaikan dengan sukses.
+

@@ -215,7 +215,7 @@ class _YearDetailScreenState extends ConsumerState<YearDetailScreen> {
                       child: Container(
                         key: _netflixKey,
                         child: _buildHorizontalLane(
-                          title: '🎬 Netflix',
+                          title: 'Netflix',
                           items: yearState.netflixItems,
                         ),
                       ),
@@ -226,7 +226,7 @@ class _YearDetailScreenState extends ConsumerState<YearDetailScreen> {
                       child: Container(
                         key: _hboKey,
                         child: _buildHorizontalLane(
-                          title: '📺 HBO',
+                          title: 'HBO',
                           items: yearState.hboItems,
                         ),
                       ),
@@ -237,7 +237,7 @@ class _YearDetailScreenState extends ConsumerState<YearDetailScreen> {
                       child: Container(
                         key: _disneyKey,
                         child: _buildHorizontalLane(
-                          title: '✨ Disney+',
+                          title: 'Disney+',
                           items: yearState.disneyItems,
                         ),
                       ),
@@ -248,7 +248,7 @@ class _YearDetailScreenState extends ConsumerState<YearDetailScreen> {
                       child: Container(
                         key: _countryKey,
                         child: _buildHorizontalLane(
-                          title: '🏳️ Best in Country',
+                          title: 'Best in Country',
                           items: yearState.bestCountryItems,
                         ),
                       ),
@@ -274,8 +274,8 @@ class _YearDetailScreenState extends ConsumerState<YearDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildHorizontalShimmerLane(title: 'Trending Now'),
-                        _buildHorizontalShimmerLane(title: '🎬 Netflix'),
-                        _buildHorizontalShimmerLane(title: '📺 HBO'),
+                        _buildHorizontalShimmerLane(title: 'Netflix'),
+                        _buildHorizontalShimmerLane(title: 'HBO'),
                       ],
                     ),
                   ),

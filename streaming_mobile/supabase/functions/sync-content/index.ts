@@ -383,16 +383,25 @@ async function syncOngoing(supabase: ReturnType<typeof createClient>) {
   const countryCache = new Map<string, number>();
   const networkCache = new Map<string, number>();
 
-  // Ambil semua series ongoing atau series yang datanya belum lengkap
+  // Ambil semua series ongoing atau series yang datanya belum lengkap, urutkan berdasarkan updated_at terlama (FIFO)
   const { data: ongoingSeries } = await supabase
     .from('series')
     .select('id, slug, number_of_seasons, status, tmdb_id')
     .or('status.eq.Returning Series,status.is.null,number_of_seasons.is.null')
-    .limit(10);
+    .order('updated_at', { ascending: true })
+    .limit(15);
 
   for (const series of ongoingSeries ?? []) {
     const detail = await fetchSeriesDetail(series.slug);
-    if (!detail) continue;
+    if (!detail) {
+      console.log(`⚠️ Gagal mengambil detail series untuk: ${series.slug}. Menyentuh baris untuk mencegah kemacetan antrean.`);
+      // Sentuh baris agar updated_at bergeser ke waktu sekarang, memindahkan series bermasalah ini ke belakang antrean
+      await supabase
+        .from('series')
+        .update({ status: series.status })
+        .eq('id', series.id);
+      continue;
+    }
 
     const tmdbId = detail.tmdbId ?? series.tmdb_id ?? null;
     let overview = detail.overview ?? null;
@@ -451,17 +460,6 @@ async function syncOngoing(supabase: ReturnType<typeof createClient>) {
       if (nId) networkIds.push(nId);
     }
 
-    // Update series metadata
-    await supabase
-      .from('series')
-      .update({
-        tmdb_id: tmdbId,
-        status: status,
-        overview: overview,
-        number_of_seasons: detail.seasons?.length ?? series.number_of_seasons,
-      })
-      .eq('id', series.id);
-
     // Link countries
     for (const cId of countryIds) {
       await supabase
@@ -487,24 +485,41 @@ async function syncOngoing(supabase: ReturnType<typeof createClient>) {
       }
     }
 
-    // Update episodes untuk setiap season
+    // Update episodes untuk setiap season & hitung season tertinggi yang valid
+    let maxSeasonWithEpisodes = 0;
     for (const season of detail.seasons ?? []) {
+      if (season.seasonNumber <= 0) continue; // Skip specials/season 0
       const eps = await fetchEpisodes(series.slug, season.seasonNumber);
-      for (const ep of eps) {
-        await supabase.from('episodes').upsert({
-          id: ep.id,
-          series_id: series.id,
-          season_number: season.seasonNumber,
-          episode_number: ep.episodeNumber,
-          title: ep.name ?? null,
-          overview: ep.overview ?? null,
-          still_path: ep.stillPath ?? null,
-          runtime: ep.runtime ?? null,
-          air_date: ep.airDate ?? null,
-        });
+      if (eps.length > 0) {
+        maxSeasonWithEpisodes = Math.max(maxSeasonWithEpisodes, season.seasonNumber);
+        for (const ep of eps) {
+          await supabase.from('episodes').upsert({
+            id: ep.id,
+            series_id: series.id,
+            season_number: season.seasonNumber,
+            episode_number: ep.episodeNumber,
+            title: ep.name ?? null,
+            overview: ep.overview ?? null,
+            still_path: ep.stillPath ?? null,
+            runtime: ep.runtime ?? null,
+            air_date: ep.airDate ?? null,
+          });
+        }
       }
       await sleep(300);
     }
+
+    // Update series metadata (gunakan maxSeasonWithEpisodes agar tab season regular sinkron)
+    const updatedSeasons = maxSeasonWithEpisodes > 0 ? maxSeasonWithEpisodes : (detail.seasons?.length ?? series.number_of_seasons);
+    await supabase
+      .from('series')
+      .update({
+        tmdb_id: tmdbId,
+        status: status,
+        overview: overview,
+        number_of_seasons: updatedSeasons,
+      })
+      .eq('id', series.id);
 
     updated++;
     await sleep(400);

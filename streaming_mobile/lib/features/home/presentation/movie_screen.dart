@@ -144,7 +144,15 @@ class _MovieScreenState extends ConsumerState<MovieScreen> {
                     ),
                   )
                 else ...[
-                  // 1. Trending Now (movies only, no interactive filters)
+                  // 1. New Updated Movies section
+                  SliverToBoxAdapter(
+                    child: _buildHorizontalUpdatedLane(
+                      title: 'New Updated',
+                      items: movieState.newUpdatedItems,
+                    ),
+                  ),
+
+                  // 2. Trending Now (movies only, no interactive filters)
                   SliverToBoxAdapter(
                     child: Container(
                       key: _trendingKey,
@@ -155,7 +163,7 @@ class _MovieScreenState extends ConsumerState<MovieScreen> {
                     ),
                   ),
 
-                  // 2. Best in Genre (movies only, no interactive filters)
+                  // 3. Best in Genre (movies only, no interactive filters)
                   SliverToBoxAdapter(
                     child: Container(
                       key: _genreKey,
@@ -171,7 +179,7 @@ class _MovieScreenState extends ConsumerState<MovieScreen> {
                     ),
                   ),
 
-                  // 3. Best in Country (movies only, no interactive filters)
+                  // 4. Best in Country (movies only, no interactive filters)
                   SliverToBoxAdapter(
                     child: Container(
                       key: _countryKey,
@@ -330,6 +338,71 @@ class _MovieScreenState extends ConsumerState<MovieScreen> {
                               : null,
                         },
                       );
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHorizontalUpdatedLane({
+    required String title,
+    required List<UpdatedItem> items,
+  }) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Text(
+            title,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 180,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: SizedBox(
+                  width: 120,
+                  child: MovieCard(
+                    title: item.title,
+                    posterUrl: item.posterUrl ?? '',
+                    voteAverage: item.voteAverage,
+                    customBadge: item.subtitle,
+                    onTap: () {
+                      if (item.isEpisode) {
+                        context.push(
+                          '/episode/${item.id}',
+                          extra: {
+                            'slug': item.slug,
+                          },
+                        );
+                      } else {
+                        context.push(
+                          '/detail/${item.slug}',
+                          extra: {
+                            'isSeries': item.isSeries,
+                            'initialSeason': item.isSeries ? item.seasonNumber : null,
+                          },
+                        );
+                      }
                     },
                   ),
                 ),

@@ -6,6 +6,7 @@ class SeriesScreenState {
   const SeriesScreenState({
     this.heroItems = const [],
     this.trendingItems = const [],
+    this.newUpdatedItems = const [],
     this.genreItems = const {},
     this.countryItems = const {},
     this.isLoading = false,
@@ -14,6 +15,7 @@ class SeriesScreenState {
 
   final List<ContentItem> heroItems;
   final List<ContentItem> trendingItems;
+  final List<UpdatedItem> newUpdatedItems;
   final Map<String, List<ContentItem>> genreItems;
   final Map<String, List<ContentItem>> countryItems;
   final bool isLoading;
@@ -22,6 +24,7 @@ class SeriesScreenState {
   SeriesScreenState copyWith({
     List<ContentItem>? heroItems,
     List<ContentItem>? trendingItems,
+    List<UpdatedItem>? newUpdatedItems,
     Map<String, List<ContentItem>>? genreItems,
     Map<String, List<ContentItem>>? countryItems,
     bool? isLoading,
@@ -29,6 +32,7 @@ class SeriesScreenState {
   }) => SeriesScreenState(
     heroItems: heroItems ?? this.heroItems,
     trendingItems: trendingItems ?? this.trendingItems,
+    newUpdatedItems: newUpdatedItems ?? this.newUpdatedItems,
     genreItems: genreItems ?? this.genreItems,
     countryItems: countryItems ?? this.countryItems,
     isLoading: isLoading ?? this.isLoading,
@@ -105,9 +109,24 @@ class SeriesScreenNotifier extends Notifier<SeriesScreenState> {
         }
       }
 
+      // 5. Fetch newest series and episodes for New Updated
+      final newSeries = await _repo.fetchSeries(page: 0, limit: 15);
+      final newEpisodes = await _repo.fetchNewestEpisodes(limit: 15);
+
+      final newUpdated = <UpdatedItem>[
+        ...newSeries.map((s) => UpdatedItem.fromSeries(s, createdAt: s.createdAt)),
+        ...newEpisodes,
+      ];
+      newUpdated.sort((a, b) {
+        final dateA = a.createdAt ?? '';
+        final dateB = b.createdAt ?? '';
+        return dateB.compareTo(dateA); // newest first
+      });
+
       state = SeriesScreenState(
         heroItems: heroItems,
         trendingItems: trending,
+        newUpdatedItems: newUpdated,
         genreItems: filteredGenreMap,
         countryItems: countryMap,
         isLoading: false,

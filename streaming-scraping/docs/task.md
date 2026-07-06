@@ -70,5 +70,7 @@ Daftar ini digunakan untuk memantau progress pengerjaan proyek. Setiap task yang
 - [x] **Koreksi TMDB ID Supabase:** Memulihkan kembali TMDB ID yang akurat di database Supabase untuk 7 series yang sempat di-reset (seperti *The Demon*, *Candy*, *The Influencer*, *Inside*, dll.).
 - [x] **Pemberantasan Request Sekuensial Scraper (10x Lebih Cepat):** Mengubah mekanisme pengunggahan di `enrich-seasons.js` agar menggunakan single-payload bulk array insert alih-alih per episode satu-satu, serta `Prefer: return=representation` untuk mempercepat lookup.
 - [x] **Penyelarasan Batas Jumlah Season (Auto-alignment):** Mengonfigurasi `enrich-seasons.js` dan database agar menyelaraskan `number_of_seasons` ke nomor season tertinggi yang benar-benar memiliki file episode di database.
+- [x] **Skrip Sinkronisasi Lokal Series Ongoing:** Membuat skrip `sync_ongoing_local.js` untuk memperbarui data series ongoing secara lokal baik secara keseluruhan maupun spesifik berdasarkan parameter `--slug` (seperti slime).
+
 
 

@@ -135,7 +135,7 @@ class _NetworkDetailScreenState extends ConsumerState<NetworkDetailScreen> {
                     SliverToBoxAdapter(
                       child: Container(
                         child: _buildHorizontalLane(
-                          title: '🏳️ Best in Genre',
+                          title: 'Best in Genre',
                           items: networkState.bestGenreItems,
                         ),
                       ),
@@ -145,7 +145,7 @@ class _NetworkDetailScreenState extends ConsumerState<NetworkDetailScreen> {
                     SliverToBoxAdapter(
                       child: Container(
                         child: _buildHorizontalLane(
-                          title: '🏳️ Best in Country',
+                          title: 'Best in Country',
                           items: networkState.bestCountryItems,
                         ),
                       ),
@@ -171,9 +171,9 @@ class _NetworkDetailScreenState extends ConsumerState<NetworkDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildHorizontalShimmerLane(title: 'Trending Now'),
-                        _buildHorizontalShimmerLane(title: '🏳️ Best in Genre'),
+                        _buildHorizontalShimmerLane(title: 'Best in Genre'),
                         _buildHorizontalShimmerLane(
-                          title: '🏳️ Best in Country',
+                          title: 'Best in Country',
                         ),
                       ],
                     ),

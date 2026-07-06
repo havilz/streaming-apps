@@ -167,8 +167,13 @@ Seluruh codebase Next.js telah di-build dengan sukses tanpa kesalahan tipe data:
 - **Penyelarasan Batas Jumlah Season (Auto-alignment):**
   - Mengonfigurasi `enrich-seasons.js` agar menyimpan jumlah season (`number_of_seasons`) berdasarkan nomor season tertinggi yang memiliki file episode, mengabaikan placeholder kosong dan season Specials (Season 0).
   - Menjalankan skrip global penyelarasan otomatis untuk mengoreksi data **113 series** di database yang memiliki kelebihan/tab kosong.
+- **Skrip Sinkronisasi Lokal Series Ongoing:**
+  - Membuat [sync_ongoing_local.js](file:///c:/project/streaming-project/streaming-scraping/sync_ongoing_local.js) untuk memproses sinkronisasi data ongoing secara lokal tanpa hambatan waktu, mendukung pembaruan global maupun spesifik via parameter `--slug`.
+  - Berhasil menyinkronkan series *That Time I Got Reincarnated as a Slime* secara lokal ke Supabase, mengunduh dan menyisipkan Season 4 Episode 13 yang baru dirilis dari IDLIX.
 
 **Keputusan teknis:**
 - Penggunaan request massal (bulk insert) menghemat ratusan request jaringan sekuensial yang sebelumnya membebani CPU & kecepatan pemrosesan lokal.
 - Penentuan jumlah season bersandar langsung pada episode database yang konkret demi keselarasan tab visual aplikasi mobile.
+- Menggunakan parameter `--slug` pada skrip lokal untuk memungkinkan pembaruan data secara instan pada satu series yang diinginkan.
+
 

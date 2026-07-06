@@ -20,6 +20,7 @@ class SeriesScreen extends ConsumerStatefulWidget {
 class _SeriesScreenState extends ConsumerState<SeriesScreen> {
   final _scrollController = ScrollController();
   bool _showGlassBackground = false;
+  String _newUpdatedFilter = 'All';
 
   final _trendingKey = GlobalKey();
   final _genreKey = GlobalKey();
@@ -144,7 +145,29 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
                     ),
                   )
                 else ...[
-                  // 1. Trending Now (series only, no interactive filters)
+                  // 1. New Updated Series/Episodes section
+                  SliverToBoxAdapter(
+                    child: Builder(
+                      builder: (context) {
+                        final filteredItems = seriesState.newUpdatedItems.where((item) {
+                          if (_newUpdatedFilter == 'Series') return item.isSeries;
+                          return true;
+                        }).toList();
+
+                        return _buildHorizontalUpdatedLane(
+                          title: 'New Updated',
+                          items: filteredItems,
+                          trailingHeader: _buildDynamicFilterRow(
+                            options: ['All', 'Series'],
+                            active: _newUpdatedFilter,
+                            onTap: (v) => setState(() => _newUpdatedFilter = v),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                  // 2. Trending Now (series only, no interactive filters)
                   SliverToBoxAdapter(
                     child: Container(
                       key: _trendingKey,
@@ -155,7 +178,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
                     ),
                   ),
 
-                  // 2. Best in Genre (series only, no interactive filters)
+                  // 3. Best in Genre (series only, no interactive filters)
                   SliverToBoxAdapter(
                     child: Container(
                       key: _genreKey,
@@ -171,7 +194,7 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
                     ),
                   ),
 
-                  // 3. Best in Country (series only, no interactive filters)
+                  // 4. Best in Country (series only, no interactive filters)
                   SliverToBoxAdapter(
                     child: Container(
                       key: _countryKey,
@@ -338,6 +361,131 @@ class _SeriesScreenState extends ConsumerState<SeriesScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildHorizontalUpdatedLane({
+    required String title,
+    required List<UpdatedItem> items,
+    Widget? trailingHeader,
+  }) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              if (trailingHeader != null) trailingHeader,
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 180,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: SizedBox(
+                  width: 120,
+                  child: MovieCard(
+                    title: item.title,
+                    posterUrl: item.posterUrl ?? '',
+                    voteAverage: item.voteAverage,
+                    customBadge: item.subtitle,
+                    onTap: () {
+                      if (item.isEpisode) {
+                        context.push(
+                          '/episode/${item.id}',
+                          extra: {
+                            'slug': item.slug,
+                          },
+                        );
+                      } else {
+                        context.push(
+                          '/detail/${item.slug}',
+                          extra: {
+                            'isSeries': item.isSeries,
+                            'initialSeason': item.isSeries ? item.seasonNumber : null,
+                          },
+                        );
+                      }
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDynamicFilterRow({
+    required List<String> options,
+    required String active,
+    required void Function(String) onTap,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: options.map((tab) {
+            final isActive = active == tab;
+            return GestureDetector(
+              onTap: () => onTap(tab),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? Colors.white.withValues(alpha: 0.15)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                  border: isActive
+                      ? Border.all(
+                          color: Colors.white.withValues(alpha: 0.1),
+                          width: 1,
+                        )
+                      : null,
+                ),
+                child: Text(
+                  tab,
+                  style: TextStyle(
+                    color: isActive ? Colors.white : Colors.white54,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
     );
   }
 

@@ -53,6 +53,7 @@ class HomeState {
   const HomeState({
     this.heroItems = const [],
     this.trendingItems = const [],
+    this.newUpdatedItems = const [],
     this.genreItems = const {},
     this.networkItems = const {},
     this.isLoading = false,
@@ -61,6 +62,7 @@ class HomeState {
 
   final List<ContentItem> heroItems;
   final List<ContentItem> trendingItems;
+  final List<UpdatedItem> newUpdatedItems;
   final Map<String, List<ContentItem>> genreItems;
   final Map<String, List<ContentItem>> networkItems;
   final bool isLoading;
@@ -69,6 +71,7 @@ class HomeState {
   HomeState copyWith({
     List<ContentItem>? heroItems,
     List<ContentItem>? trendingItems,
+    List<UpdatedItem>? newUpdatedItems,
     Map<String, List<ContentItem>>? genreItems,
     Map<String, List<ContentItem>>? networkItems,
     bool? isLoading,
@@ -76,6 +79,7 @@ class HomeState {
   }) => HomeState(
     heroItems: heroItems ?? this.heroItems,
     trendingItems: trendingItems ?? this.trendingItems,
+    newUpdatedItems: newUpdatedItems ?? this.newUpdatedItems,
     genreItems: genreItems ?? this.genreItems,
     networkItems: networkItems ?? this.networkItems,
     isLoading: isLoading ?? this.isLoading,
@@ -183,9 +187,28 @@ class HomeNotifier extends Notifier<HomeState> {
         'Disney+': networkResults[2].map(ContentItem.fromSeries).toList(),
       };
 
+      // 5. Fetch newest movies, series, and episodes for "New Updated" section
+      final newMovies = await _repo.fetchMovies(page: 0, limit: 15);
+      final newSeries = await _repo.fetchSeries(page: 0, limit: 15);
+      final newEpisodes = await _repo.fetchNewestEpisodes(limit: 15);
+
+      final combinedNewUpdated = <UpdatedItem>[
+        ...newMovies.map((m) => UpdatedItem.fromMovie(m, createdAt: m.createdAt)),
+        ...newSeries.map((s) => UpdatedItem.fromSeries(s, createdAt: s.createdAt)),
+        ...newEpisodes,
+      ];
+      
+      // Sort combined chronologically by created_at desc
+      combinedNewUpdated.sort((a, b) {
+        final dateA = a.createdAt ?? '';
+        final dateB = b.createdAt ?? '';
+        return dateB.compareTo(dateA); // newest first
+      });
+
       state = HomeState(
         heroItems: heroItems,
         trendingItems: trending,
+        newUpdatedItems: combinedNewUpdated,
         genreItems: filteredGenreMap,
         networkItems: networkMap,
         isLoading: false,

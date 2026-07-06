@@ -201,4 +201,10 @@ Daftar ini digunakan untuk memantau progress pengerjaan aplikasi mobile. Setiap 
 - [x] Integrasi Custom Video Player ala Netflix dari nol (menggantikan pustaka Chewie) dengan fitur aspect ratio, double-tap seek, timeline slider, dan kontrol auto-hide
 - [x] Perbaikan inisialisasi video player menggunakan blok `try-catch` untuk menghindari silent crash saat HLS stream gagal dimuat, serta menampilkan pesan error via SnackBar
 - [x] Penyelarasan tampilan tab pemilih season di aplikasi mobile agar sinkron dengan data regular season, menghindari tab kosong yang disebabkan oleh season Specials (Season 0)
+- [x] Optimasi antrean sinkronisasi (sync-content Edge Function) menggunakan pengurutan `updated_at` ascending untuk mencegah head-of-line blocking (kemacetan antrean akibat series rusak)
+- [x] Implementasi anti-blocking "touch" logic pada Edge Function: memperbarui `updated_at` series di database meskipun data IDLIX gagal diambil agar tidak menyumbat antrean
+- [x] Implementasi seksi "New Updated" pada beranda utama (`HomeScreen`), halaman film (`MovieScreen`), dan halaman serial TV (`SeriesScreen`) dengan filter interaktif untuk mempermudah verifikasi sinkronisasi konten
+- [x] Penambahan pintasan langsung ke rincian episode (`EpisodeDetailScreen`) ketika menekan kartu episode pada seksi "New Updated"
+
+
 

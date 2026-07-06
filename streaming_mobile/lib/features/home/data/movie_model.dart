@@ -41,6 +41,7 @@ class MovieModel {
     this.status,
     this.genres = const [],
     this.countries = const [],
+    this.createdAt,
   });
 
   final String id;
@@ -65,6 +66,7 @@ class MovieModel {
 
   /// Daftar nama negara (sudah diparsing dari relasi)
   final List<String> countries;
+  final String? createdAt;
 
   String get year => _yearFrom(releaseDate);
   String? get posterUrl => _posterUrl(posterPath);
@@ -107,6 +109,7 @@ class MovieModel {
       status: map['status'] as String?,
       genres: genreList,
       countries: countryList,
+      createdAt: map['created_at'] as String?,
     );
   }
 }
@@ -134,6 +137,7 @@ class SeriesModel {
     this.genres = const [],
     this.networks = const [],
     this.countries = const [],
+    this.createdAt,
   });
 
   final String id;
@@ -156,6 +160,7 @@ class SeriesModel {
   final List<String> genres;
   final List<String> networks;
   final List<String> countries;
+  final String? createdAt;
 
   bool get isOngoing => status == 'Returning Series';
   String get year => _yearFrom(firstAirDate);
@@ -208,6 +213,7 @@ class SeriesModel {
       genres: genreList,
       networks: networkList,
       countries: countryList,
+      createdAt: map['created_at'] as String?,
     );
   }
 }
@@ -285,3 +291,101 @@ class ContentItem {
     countries: s.countries,
   );
 }
+
+// ─────────────────────────────────────────────────────────────
+// UpdatedItem — model untuk section "New Updated"
+// ─────────────────────────────────────────────────────────────
+
+class UpdatedItem {
+  const UpdatedItem({
+    required this.id,
+    required this.title,
+    this.subtitle,
+    this.posterUrl,
+    this.backdropUrl,
+    required this.slug,
+    this.voteAverage,
+    required this.isEpisode,
+    required this.isSeries,
+    required this.isMovie,
+    this.seasonNumber,
+    this.episodeNumber,
+    this.episodeTitle,
+    this.createdAt,
+  });
+
+  final String id;
+  final String title;
+  final String? subtitle;
+  final String? posterUrl;
+  final String? backdropUrl;
+  final String slug;
+  final double? voteAverage;
+  final bool isEpisode;
+  final bool isSeries;
+  final bool isMovie;
+  final int? seasonNumber;
+  final int? episodeNumber;
+  final String? episodeTitle;
+  final String? createdAt;
+
+  factory UpdatedItem.fromMovie(MovieModel m, {String? createdAt}) => UpdatedItem(
+        id: m.id,
+        title: m.title,
+        subtitle: 'Movie',
+        posterUrl: m.posterUrl,
+        backdropUrl: m.backdropUrl,
+        slug: m.slug,
+        voteAverage: m.voteAverage,
+        isEpisode: false,
+        isSeries: false,
+        isMovie: true,
+        createdAt: createdAt,
+      );
+
+  factory UpdatedItem.fromSeries(SeriesModel s, {String? createdAt}) => UpdatedItem(
+        id: s.id,
+        title: s.title,
+        subtitle: 'Series',
+        posterUrl: s.posterUrl,
+        backdropUrl: s.backdropUrl,
+        slug: s.slug,
+        voteAverage: s.voteAverage,
+        isEpisode: false,
+        isSeries: true,
+        isMovie: false,
+        createdAt: createdAt,
+      );
+
+  factory UpdatedItem.fromEpisodeMap(Map<String, dynamic> map) {
+    final seriesData = map['series'] as Map<String, dynamic>?;
+    final seriesTitle = seriesData?['title'] as String? ?? 'Series';
+    final seriesSlug = seriesData?['slug'] as String? ?? '';
+    final seriesPoster = seriesData?['poster_path'] as String?;
+    final seriesBackdrop = seriesData?['backdrop_path'] as String?;
+    final seriesVote = (seriesData?['vote_average'] as num?)?.toDouble();
+
+    final epTitle = map['title'] as String?;
+    final seasonNumber = (map['season_number'] as num?)?.toInt() ?? 1;
+    final episodeNumber = (map['episode_number'] as num?)?.toInt() ?? 1;
+    final stillPath = map['still_path'] as String? ?? seriesPoster;
+
+    return UpdatedItem(
+      id: map['id'] as String,
+      title: seriesTitle,
+      subtitle: 'S${seasonNumber}E${episodeNumber}',
+      posterUrl: _posterUrl(stillPath),
+      backdropUrl: _backdropUrl(map['still_path'] as String? ?? seriesBackdrop),
+      slug: seriesSlug,
+      voteAverage: seriesVote,
+      isEpisode: true,
+      isSeries: false,
+      isMovie: false,
+      seasonNumber: seasonNumber,
+      episodeNumber: episodeNumber,
+      episodeTitle: epTitle,
+      createdAt: map['created_at'] as String?,
+    );
+  }
+}
+

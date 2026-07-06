@@ -22,6 +22,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   bool _showGlassBackground = false;
   String _trendingFilter = 'All';
   String _genreFilter = 'All';
+  String _newUpdatedFilter = 'All';
 
   final _trendingKey = GlobalKey();
   final _genreKey = GlobalKey();
@@ -113,31 +114,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final homeState = ref.watch(homeProvider);
 
     ref.listen<SyncState>(syncProvider, (previous, next) {
-      if (next.status == SyncStatus.loading) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Mensinkronkan konten baru dari server...'),
-            duration: Duration(seconds: 30),
-          ),
-        );
-      } else if (next.status == SyncStatus.success) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Sinkronisasi selesai! ${next.message}'),
-            backgroundColor: Colors.green,
-          ),
-        );
+      if (next.status == SyncStatus.success) {
         ref.read(homeProvider.notifier).reload();
-      } else if (next.status == SyncStatus.error) {
-        ScaffoldMessenger.of(context).hideCurrentSnackBar();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal sinkronisasi: ${next.message}'),
-            backgroundColor: Colors.red,
-          ),
-        );
       }
     });
 
@@ -185,7 +163,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   )
                 else ...[
-                  // 1. Trending Now
+                  // 1. New Updated section
+                  SliverToBoxAdapter(
+                    child: Builder(
+                      builder: (context) {
+                        final filteredItems = homeState.newUpdatedItems.where((item) {
+                          if (_newUpdatedFilter == 'Movie') return item.isMovie;
+                          if (_newUpdatedFilter == 'Series') return item.isSeries || item.isEpisode;
+                          return true;
+                        }).toList();
+
+                        return _buildHorizontalUpdatedLane(
+                          title: 'New Updated',
+                          items: filteredItems,
+                          trailingHeader: _buildDynamicFilterRow(
+                            options: ['All', 'Movie', 'Series'],
+                            active: _newUpdatedFilter,
+                            onTap: (v) => setState(() => _newUpdatedFilter = v),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+
+                  // 2. Trending Now
                   SliverToBoxAdapter(
                     child: Container(
                       key: _trendingKey,
@@ -197,7 +198,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   ),
 
-                  // 2. Best in Genre — All / Movie / Series filter
+                  // 3. Best in Genre — All / Movie / Series filter
                   SliverToBoxAdapter(
                     child: Container(
                       key: _genreKey,
@@ -226,31 +227,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     ),
                   ),
 
-                  // 3. Netflix section
+                  // 4. Netflix section
                   SliverToBoxAdapter(
                     child: Container(
                       key: _netflixKey,
                       child: _buildHorizontalLane(
-                        title: '🎬 Netflix',
+                        title: 'Netflix',
                         items: homeState.networkItems['Netflix'] ?? [],
                         showWhenEmpty: true,
                       ),
                     ),
                   ),
 
-                  // 4. HBO section
+                  // 5. HBO section
                   SliverToBoxAdapter(
                     child: _buildHorizontalLane(
-                      title: '📺 HBO',
+                      title: 'HBO',
                       items: homeState.networkItems['HBO'] ?? [],
                       showWhenEmpty: true,
                     ),
                   ),
 
-                  // 5. Disney+ section
+                  // 6. Disney+ section
                   SliverToBoxAdapter(
                     child: _buildHorizontalLane(
-                      title: '✨ Disney+',
+                      title: 'Disney+',
                       items: homeState.networkItems['Disney+'] ?? [],
                       showWhenEmpty: true,
                     ),
@@ -533,6 +534,78 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           }).toList(),
         ),
       ),
+    );
+  }
+
+  Widget _buildHorizontalUpdatedLane({
+    required String title,
+    required List<UpdatedItem> items,
+    Widget? trailingHeader,
+  }) {
+    if (items.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              if (trailingHeader != null) trailingHeader,
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 180,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: items.length,
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: SizedBox(
+                  width: 120,
+                  child: MovieCard(
+                    title: item.title,
+                    posterUrl: item.posterUrl ?? '',
+                    voteAverage: item.voteAverage,
+                    customBadge: item.subtitle,
+                    onTap: () {
+                      if (item.isEpisode) {
+                        context.push(
+                          '/episode/${item.id}',
+                          extra: {
+                            'slug': item.slug,
+                          },
+                        );
+                      } else {
+                        context.push(
+                          '/detail/${item.slug}',
+                          extra: {
+                            'isSeries': item.isSeries,
+                            'initialSeason': item.isSeries ? item.seasonNumber : null,
+                          },
+                        );
+                      }
+                    },
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

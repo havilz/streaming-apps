@@ -14,6 +14,7 @@ class MovieCard extends StatefulWidget {
     this.voteAverage,
     this.numberOfSeasons,
     this.season,
+    this.customBadge,
     this.onTap,
   });
 
@@ -23,6 +24,7 @@ class MovieCard extends StatefulWidget {
   final double? voteAverage;
   final int? numberOfSeasons;
   final int? season;
+  final String? customBadge;
   final VoidCallback? onTap;
 
   @override
@@ -83,8 +85,9 @@ class _MovieCardState extends State<MovieCard> {
                   ),
                 ),
 
-                if ((widget.season ?? widget.numberOfSeasons) != null &&
-                    (widget.season ?? widget.numberOfSeasons)! > 0)
+                if (widget.customBadge != null ||
+                    ((widget.season ?? widget.numberOfSeasons) != null &&
+                    (widget.season ?? widget.numberOfSeasons)! > 0))
                   Positioned(
                     top: 6,
                     right: 6,
@@ -102,7 +105,7 @@ class _MovieCardState extends State<MovieCard> {
                         ),
                       ),
                       child: Text(
-                        'S${widget.season ?? widget.numberOfSeasons}',
+                        widget.customBadge ?? 'S${widget.season ?? widget.numberOfSeasons}',
                         style: const TextStyle(
                           color: AppColors.primary,
                           fontSize: 9,
