@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
@@ -17,6 +19,13 @@ class PlayerSubtitle {
   });
 }
 
+class HlsResolution {
+  final String label;
+  final String url;
+
+  const HlsResolution({required this.label, required this.url});
+}
+
 class CustomVideoPlayer extends StatefulWidget {
   const CustomVideoPlayer({
     super.key,
@@ -28,6 +37,10 @@ class CustomVideoPlayer extends StatefulWidget {
     this.onSubtitleTrackChanged,
     this.isFullScreen = false,
     required this.onBack,
+    this.currentResolutionLabel,
+    this.onResolutionChanged,
+    this.onFullScreenControllerChanged,
+    this.initialResolutions,
   });
 
   final VideoPlayerController controller;
@@ -38,6 +51,10 @@ class CustomVideoPlayer extends StatefulWidget {
   final ValueChanged<SubtitleTrack>? onSubtitleTrackChanged;
   final bool isFullScreen;
   final VoidCallback onBack;
+  final String? currentResolutionLabel;
+  final Future<void> Function(String url, String label)? onResolutionChanged;
+  final void Function(VideoPlayerController newController, String label)? onFullScreenControllerChanged;
+  final List<HlsResolution>? initialResolutions;
 
   @override
   State<CustomVideoPlayer> createState() => _CustomVideoPlayerState();
@@ -138,10 +155,213 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
   bool _isLeftSkip = true;
   Timer? _skipOverlayTimer;
 
+  // HLS resolutions state variables
+  String? _originalMasterUrl;
+  List<HlsResolution> _availableResolutions = [];
+  String _activeResolutionLabel = 'Auto';
+
   @override
   void initState() {
     super.initState();
+    _originalMasterUrl = widget.controller.dataSource;
+    _activeResolutionLabel = widget.currentResolutionLabel ?? 'Auto';
+    if (widget.initialResolutions != null) {
+      _availableResolutions = List.from(widget.initialResolutions!);
+    } else {
+      _loadResolutions();
+    }
     _startHideTimer();
+  }
+
+  @override
+  void didUpdateWidget(covariant CustomVideoPlayer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.currentResolutionLabel != oldWidget.currentResolutionLabel) {
+      setState(() {
+        _activeResolutionLabel = widget.currentResolutionLabel ?? 'Auto';
+      });
+    }
+    final newUrl = widget.controller.dataSource;
+    final isNewVideo = newUrl != _originalMasterUrl &&
+        !_availableResolutions.any((r) => r.url == newUrl);
+    if (isNewVideo) {
+      _originalMasterUrl = newUrl;
+      _activeResolutionLabel = widget.currentResolutionLabel ?? 'Auto';
+      _loadResolutions();
+    }
+  }
+
+  Future<void> _loadResolutions() async {
+    final dataSource = _originalMasterUrl ?? widget.controller.dataSource;
+    debugPrint('[CustomPlayer] Loading resolutions for: $dataSource');
+
+    if (dataSource.endsWith('.mp4')) {
+      debugPrint('[CustomPlayer] Video is static MP4, skipping HLS parsing.');
+      return;
+    }
+
+    final List<HlsResolution> list = [];
+    final client = HttpClient();
+    client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+    try {
+      final uri = Uri.parse(dataSource);
+      final request = await client.getUrl(uri);
+      // Add standard desktop browser headers to bypass host blocks / 403 Forbidden
+      request.headers.add('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+      request.headers.add('Referer', 'https://idlixku.com/');
+
+      final response = await request.close();
+      debugPrint('[CustomPlayer] First request response: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        final body = await response.transform(utf8.decoder).join();
+        String m3u8Content = body;
+        Uri currentUri = uri;
+
+        // Check if response is a JSON config wrapping the actual HLS URL
+        final trimmedBody = body.trim();
+        if (trimmedBody.startsWith('{')) {
+          try {
+            final parsedJson = jsonDecode(trimmedBody);
+            if (parsedJson is Map && parsedJson.containsKey('url')) {
+              final nestedUrl = parsedJson['url'] as String;
+              debugPrint('[CustomPlayer] Found nested HLS URL in JSON: $nestedUrl');
+              currentUri = Uri.parse(nestedUrl);
+
+              final request2 = await client.getUrl(currentUri);
+              request2.headers.add('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+              request2.headers.add('Referer', 'https://idlixku.com/');
+              final response2 = await request2.close();
+              debugPrint('[CustomPlayer] Nested request response: ${response2.statusCode}');
+              
+              if (response2.statusCode == 200) {
+                m3u8Content = await response2.transform(utf8.decoder).join();
+              }
+            }
+          } catch (e) {
+            debugPrint('[CustomPlayer] Error parsing nested HLS JSON: $e');
+          }
+        }
+
+        final lines = m3u8Content.replaceAll('\r\n', '\n').split('\n');
+        String? streamInf;
+        for (var line in lines) {
+          final trimmed = line.trim();
+          if (trimmed.isEmpty) continue;
+
+          if (trimmed.startsWith('#EXT-X-STREAM-INF:')) {
+            streamInf = trimmed;
+          } else if (streamInf != null && !trimmed.startsWith('#')) {
+            final absoluteUrl = currentUri.resolve(trimmed).toString();
+            
+            String label = 'Quality';
+            final resMatch = RegExp(r'RESOLUTION=\d+x(\d+)').firstMatch(streamInf);
+            if (resMatch != null) {
+              label = '${resMatch.group(1)}p';
+            } else {
+              final nameMatch = RegExp(r'NAME="([^"]+)"').firstMatch(streamInf);
+              if (nameMatch != null) {
+                label = nameMatch.group(1)!;
+              }
+            }
+
+            if (!list.any((r) => r.url == absoluteUrl)) {
+              list.add(HlsResolution(label: label, url: absoluteUrl));
+            }
+            streamInf = null;
+          }
+        }
+        debugPrint('[CustomPlayer] Successfully parsed ${list.length} HLS qualities.');
+      }
+    } catch (e) {
+      debugPrint('[CustomPlayer] HLS parsing exception: $e');
+    } finally {
+      client.close();
+      if (mounted) {
+        setState(() {
+          _availableResolutions = list;
+        });
+      }
+    }
+  }
+
+  void _showResolutionSelector() {
+    _resetHideTimer();
+    if (_availableResolutions.isEmpty || widget.onResolutionChanged == null) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16.0),
+                child: Text(
+                  'Pilih Kualitas Video',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ),
+              const Divider(color: Colors.white12, height: 1),
+              Flexible(
+                child: ListView(
+                  shrinkWrap: true,
+                  children: [
+                    ListTile(
+                      title: Text(
+                        'Otomatis (Auto)',
+                        style: TextStyle(
+                          color: _activeResolutionLabel == 'Auto' ? AppColors.primary : Colors.white,
+                          fontWeight: _activeResolutionLabel == 'Auto' ? FontWeight.bold : FontWeight.normal,
+                        ),
+                      ),
+                      trailing: _activeResolutionLabel == 'Auto'
+                          ? const Icon(Icons.check_rounded, color: AppColors.primary)
+                          : null,
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        if (_activeResolutionLabel != 'Auto' && _originalMasterUrl != null) {
+                          widget.onResolutionChanged!(_originalMasterUrl!, 'Auto');
+                        }
+                      },
+                    ),
+                    ..._availableResolutions.map((res) {
+                      final isSelected = _activeResolutionLabel == res.label;
+                      return ListTile(
+                        title: Text(
+                          res.label,
+                          style: TextStyle(
+                            color: isSelected ? AppColors.primary : Colors.white,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                        trailing: isSelected
+                            ? const Icon(Icons.check_rounded, color: AppColors.primary)
+                            : null,
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          if (_activeResolutionLabel != res.label) {
+                            widget.onResolutionChanged!(res.url, res.label);
+                          }
+                        },
+                      );
+                    }),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -690,6 +910,14 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
                             onPressed: _showSubtitleSelector,
                           ),
 
+                        // Resolution Selector Gear Button (available if parsed HLS resolutions exist)
+                        if (_availableResolutions.isNotEmpty && widget.onResolutionChanged != null)
+                          IconButton(
+                            iconSize: widget.isFullScreen ? 24 : 18,
+                            icon: const Icon(Icons.settings_outlined, color: Colors.white),
+                            onPressed: _showResolutionSelector,
+                          ),
+
                         const Spacer(),
 
                         // Dynamic Fullscreen / Aspect Ratio toggles
@@ -722,6 +950,10 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
                                     subtitleTracks: widget.subtitleTracks,
                                     currentSubtitleTrack: widget.currentSubtitleTrack,
                                     onSubtitleTrackChanged: widget.onSubtitleTrackChanged,
+                                    currentResolutionLabel: _activeResolutionLabel,
+                                    onResolutionChanged: widget.onResolutionChanged,
+                                    onFullScreenControllerChanged: widget.onFullScreenControllerChanged,
+                                    initialResolutions: _availableResolutions,
                                   ),
                                 ),
                               );
@@ -777,6 +1009,10 @@ class FullScreenPlayerPage extends StatefulWidget {
   final List<SubtitleTrack>? subtitleTracks;
   final SubtitleTrack? currentSubtitleTrack;
   final ValueChanged<SubtitleTrack>? onSubtitleTrackChanged;
+  final String? currentResolutionLabel;
+  final Future<void> Function(String url, String label)? onResolutionChanged;
+  final void Function(VideoPlayerController newController, String label)? onFullScreenControllerChanged;
+  final List<HlsResolution>? initialResolutions;
 
   const FullScreenPlayerPage({
     super.key,
@@ -786,6 +1022,10 @@ class FullScreenPlayerPage extends StatefulWidget {
     this.subtitleTracks,
     this.currentSubtitleTrack,
     this.onSubtitleTrackChanged,
+    this.currentResolutionLabel,
+    this.onResolutionChanged,
+    this.onFullScreenControllerChanged,
+    this.initialResolutions,
   });
 
   @override
@@ -793,14 +1033,58 @@ class FullScreenPlayerPage extends StatefulWidget {
 }
 
 class _FullScreenPlayerPageState extends State<FullScreenPlayerPage> {
+  late VideoPlayerController _activeController;
+  late String _activeResolutionLabel;
+
   @override
   void initState() {
     super.initState();
+    _activeController = widget.controller;
+    _activeResolutionLabel = widget.currentResolutionLabel ?? 'Auto';
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  Future<void> _changeResolution(String url, String label) async {
+    final oldController = _activeController;
+    final position = oldController.value.position;
+    final isPlaying = oldController.value.isPlaying;
+
+    final uri = Uri.parse(url);
+    final isHls = uri.path.contains('.m3u8') || url.contains('m3u8') || !uri.path.endsWith('.mp4');
+
+    final newController = VideoPlayerController.networkUrl(
+      uri,
+      formatHint: isHls ? VideoFormat.hls : null,
+    );
+
+    try {
+      await newController.initialize();
+      await newController.seekTo(position);
+      if (isPlaying) {
+        await newController.play();
+      }
+
+      if (widget.onFullScreenControllerChanged != null) {
+        widget.onFullScreenControllerChanged!(newController, label);
+      }
+
+      if (mounted) {
+        setState(() {
+          _activeController = newController;
+          _activeResolutionLabel = label;
+        });
+      }
+
+      // Safe to dispose the old controller now
+      await oldController.dispose();
+    } catch (e) {
+      debugPrint('[FullScreenPlayerPage] Resolution switch failed: $e');
+      newController.dispose();
+    }
   }
 
   @override
@@ -817,7 +1101,7 @@ class _FullScreenPlayerPageState extends State<FullScreenPlayerPage> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: CustomVideoPlayer(
-        controller: widget.controller,
+        controller: _activeController,
         title: widget.title,
         subtitles: widget.subtitles,
         subtitleTracks: widget.subtitleTracks,
@@ -825,6 +1109,9 @@ class _FullScreenPlayerPageState extends State<FullScreenPlayerPage> {
         onSubtitleTrackChanged: widget.onSubtitleTrackChanged,
         isFullScreen: true,
         onBack: () => Navigator.pop(context),
+        currentResolutionLabel: _activeResolutionLabel,
+        onResolutionChanged: _changeResolution,
+        initialResolutions: widget.initialResolutions,
       ),
     );
   }

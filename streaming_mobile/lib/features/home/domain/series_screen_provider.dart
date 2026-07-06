@@ -110,12 +110,25 @@ class SeriesScreenNotifier extends Notifier<SeriesScreenState> {
       }
 
       // 5. Fetch newest series and episodes for New Updated
-      final newSeries = await _repo.fetchSeries(page: 0, limit: 15);
-      final newEpisodes = await _repo.fetchNewestEpisodes(limit: 15);
+      final newSeries = await _repo.fetchSeries(page: 0, limit: 100);
+      final newEpisodes = await _repo.fetchNewestEpisodes(limit: 100);
+
+      bool isNewOr2026(String? dateStr) {
+        if (dateStr != null && dateStr.length >= 4) {
+          final year = int.tryParse(dateStr.substring(0, 4)) ?? 0;
+          return year >= 2026;
+        }
+        return false;
+      }
+
+      final filteredSeries = newSeries
+          .where((s) => isNewOr2026(s.firstAirDate))
+          .take(15)
+          .toList();
 
       final newUpdated = <UpdatedItem>[
-        ...newSeries.map((s) => UpdatedItem.fromSeries(s, createdAt: s.createdAt)),
-        ...newEpisodes,
+        ...filteredSeries.map((s) => UpdatedItem.fromSeries(s, createdAt: s.createdAt)),
+        ...newEpisodes.take(15),
       ];
       newUpdated.sort((a, b) {
         final dateA = a.createdAt ?? '';

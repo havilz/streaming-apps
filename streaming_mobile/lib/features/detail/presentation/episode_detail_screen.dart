@@ -450,6 +450,43 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
   VideoPlayerController? _videoController;
   List<PlayerSubtitle>? _subtitles;
   SubtitleTrack? _currentSubtitleTrack;
+  String _currentResolutionLabel = 'Auto';
+
+  Future<void> _handleResolutionChanged(String url, String label) async {
+    final oldController = _videoController;
+    final position = oldController?.value.position ?? Duration.zero;
+    final isPlaying = oldController?.value.isPlaying ?? false;
+
+    final uri = Uri.parse(url);
+    final isHls = uri.path.contains('.m3u8') || url.contains('m3u8') || !uri.path.endsWith('.mp4');
+
+    final newController = VideoPlayerController.networkUrl(
+      uri,
+      formatHint: isHls ? VideoFormat.hls : null,
+    );
+
+    try {
+      await newController.initialize();
+      await newController.seekTo(position);
+      if (isPlaying) {
+        await newController.play();
+      }
+
+      if (mounted) {
+        setState(() {
+          _videoController = newController;
+          _currentResolutionLabel = label;
+        });
+      }
+
+      if (oldController != null) {
+        await oldController.dispose();
+      }
+    } catch (e) {
+      debugPrint('[EpisodeDetailScreen] Quality swap failed: $e');
+      newController.dispose();
+    }
+  }
 
   @override
   void initState() {
@@ -574,6 +611,14 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
               },
               onBack: () {
                 Navigator.of(context).pop();
+              },
+              currentResolutionLabel: _currentResolutionLabel,
+              onResolutionChanged: _handleResolutionChanged,
+              onFullScreenControllerChanged: (newController, label) {
+                setState(() {
+                  _videoController = newController;
+                  _currentResolutionLabel = label;
+                });
               },
             ),
           ],

@@ -188,14 +188,32 @@ class HomeNotifier extends Notifier<HomeState> {
       };
 
       // 5. Fetch newest movies, series, and episodes for "New Updated" section
-      final newMovies = await _repo.fetchMovies(page: 0, limit: 15);
-      final newSeries = await _repo.fetchSeries(page: 0, limit: 15);
-      final newEpisodes = await _repo.fetchNewestEpisodes(limit: 15);
+      final newMovies = await _repo.fetchMovies(page: 0, limit: 100);
+      final newSeries = await _repo.fetchSeries(page: 0, limit: 100);
+      final newEpisodes = await _repo.fetchNewestEpisodes(limit: 100);
+
+      bool isNewOr2026(String? dateStr) {
+        if (dateStr != null && dateStr.length >= 4) {
+          final year = int.tryParse(dateStr.substring(0, 4)) ?? 0;
+          return year >= 2026;
+        }
+        return false;
+      }
+
+      final filteredMovies = newMovies
+          .where((m) => isNewOr2026(m.releaseDate))
+          .take(15)
+          .toList();
+
+      final filteredSeries = newSeries
+          .where((s) => isNewOr2026(s.firstAirDate))
+          .take(15)
+          .toList();
 
       final combinedNewUpdated = <UpdatedItem>[
-        ...newMovies.map((m) => UpdatedItem.fromMovie(m, createdAt: m.createdAt)),
-        ...newSeries.map((s) => UpdatedItem.fromSeries(s, createdAt: s.createdAt)),
-        ...newEpisodes,
+        ...filteredMovies.map((m) => UpdatedItem.fromMovie(m, createdAt: m.createdAt)),
+        ...filteredSeries.map((s) => UpdatedItem.fromSeries(s, createdAt: s.createdAt)),
+        ...newEpisodes.take(15),
       ];
       
       // Sort combined chronologically by created_at desc
