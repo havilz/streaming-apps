@@ -206,5 +206,23 @@ Daftar ini digunakan untuk memantau progress pengerjaan aplikasi mobile. Setiap 
 - [x] Implementasi seksi "New Updated" pada beranda utama (`HomeScreen`), halaman film (`MovieScreen`), dan halaman serial TV (`SeriesScreen`) dengan filter interaktif untuk mempermudah verifikasi sinkronisasi konten
 - [x] Penambahan pintasan langsung ke rincian episode (`EpisodeDetailScreen`) ketika menekan kartu episode pada seksi "New Updated"
 
+---
+
+### Task 10. Perbaikan Sound menghilang pada saat ganti resolusi video
+- [x] Hentikan (pause) dan senyapkan (mute/setVolume 0.0) controller video lama sesaat sebelum menginisialisasi controller baru di `player_screen.dart`, `episode_detail_screen.dart`, dan `custom_video_player.dart`
+- [x] Konfigurasi seluruh inisialisasi controller dengan opsi `mixWithOthers: true` pada `VideoPlayerOptions`
+- [x] Panggil fungsi `setVolume(1.0)` secara eksplisit segera setelah controller video baru selesai diinisialisasi
+- [x] Implementasikan penanganan error (fail-safe recovery) agar jika inisialisasi controller baru gagal, volume controller lama dikembalikan ke `1.0` dan diputar kembali secara otomatis
+
+---
+
+### Task 11. Perbaikan Masalah Gagal Memutar Video setelah 1 hari penginstallan (Masih Berlanjut)
+- [x] Lakukan investigasi penyebab kegagalan stream dengan memanggil Edge Function Supabase Cloud secara terprogram (ditemukan error 403 / Cloudflare Challenge)
+- [x] Tambahkan package `flutter_inappwebview: ^6.1.5` ke `pubspec.yaml`
+- [x] Buat class `CloudflareBypassService` di client untuk melakukan cookie harvesting (`cf_clearance` & User-Agent) secara headless/tersembunyi
+- [x] Refaktor `DetailRepository.unlockStream` untuk menjalankan 3-step Pentos flow secara lokal di Dart dengan cookie hasil panen
+- [x] Implementasikan **Global Background Sync** (Level 1) pada saat Home Screen dimuat, lengkap dengan cooldown throttling **30 menit**
+- [x] Implementasikan **Just-In-Time (JIT) Targeted Sync** (Level 2) pada saat halaman Detail Series dibuka, lengkap dengan cooldown throttling **5 menit**
+- [/] Uji fungsionalitas pemutaran video dan sinkronisasi konten baru di perangkat tanpa local dev backend untuk memastikan 100% bypass berhasil secara live
 
 

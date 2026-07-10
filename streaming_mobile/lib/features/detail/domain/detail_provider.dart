@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:streaming_mobile/core/core.dart';
 import 'package:streaming_mobile/features/detail/data/data.dart';
 import 'package:streaming_mobile/features/home/data/movie_model.dart';
 
@@ -155,6 +156,16 @@ class StreamNotifier extends Notifier<StreamState> {
   Future<void> unlock({required String slug, required bool isMovie}) async {
     if (state.isLoading) return;
     state = const StreamState(isLoading: true, step: 1);
+
+    try {
+      final baseUrl = const String.fromEnvironment('IDLIX_BASE_URL', defaultValue: 'https://z2.idlixku.com');
+      await CloudflareBypassService.instance.ensureBypass(baseUrl);
+    } catch (e) {
+      print('[StreamNotifier] Failed to harvest Cloudflare cookies: $e');
+      state = const StreamState(error: 'Gagal menembus proteksi Cloudflare. Coba lagi.');
+      return;
+    }
+
     state = state.copyWith(step: 2);
 
     final result = await ref

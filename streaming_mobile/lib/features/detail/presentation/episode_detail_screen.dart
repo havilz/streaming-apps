@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:streaming_mobile/core/core.dart';
+import 'package:streaming_mobile/core/utils/file_logger.dart';
 import 'package:streaming_mobile/features/detail/data/data.dart';
 import 'package:streaming_mobile/features/detail/domain/detail_provider.dart';
 import 'package:streaming_mobile/shared/shared.dart';
@@ -34,6 +35,7 @@ class _EpisodeDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
   late String _activeEpisodeId;
   EpisodeModel? _lastKnownEpisode;
   bool _isPlaying = false;
+  bool _hasSyncedSeries = false;
 
   @override
   void initState() {
@@ -53,7 +55,12 @@ class _EpisodeDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
   @override
   void didUpdateWidget(covariant EpisodeDetailScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.slug != widget.slug) {
+      _hasSyncedSeries = false;
+    }
     if (oldWidget.episodeId != widget.episodeId) {
+      ref.read(streamProviderFor(oldWidget.episodeId).notifier).reset();
+      ref.read(streamProviderFor(widget.episodeId).notifier).reset();
       setState(() {
         _activeEpisodeId = widget.episodeId;
         _isPlaying = false;
@@ -68,8 +75,27 @@ class _EpisodeDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
   }
 
   @override
+  void dispose() {
+    ref.read(streamProviderFor(_activeEpisodeId).notifier).reset();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final episodeAsync = ref.watch(episodeDetailProvider(_activeEpisodeId));
+    final seriesDetailAsync = ref.watch(seriesDetailProvider(widget.slug));
+    final activeSeason = ref.watch(activeSeasonProviderFor(widget.slug));
+
+    seriesDetailAsync.whenData((series) {
+      if (series != null && !_hasSyncedSeries) {
+        _hasSyncedSeries = true;
+        ClientSyncService.syncSeriesEpisodes(series.id, series.slug).then((_) {
+          if (mounted) {
+            ref.invalidate(episodesProvider((seriesId: series.id, season: activeSeason)));
+          }
+        });
+      }
+    });
 
     // Sinkronisasi active season jika data episode dimuat asinkron
     episodeAsync.whenData((episode) {
@@ -101,6 +127,8 @@ class _EpisodeDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
                   });
                 },
                 onEpisodeSelect: (newId, ep) {
+                  ref.read(streamProviderFor(_activeEpisodeId).notifier).reset();
+                  ref.read(streamProviderFor(newId).notifier).reset();
                   setState(() {
                     _activeEpisodeId = newId;
                     _isPlaying = false;
@@ -123,6 +151,8 @@ class _EpisodeDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
                   });
                 },
                 onEpisodeSelect: (newId, ep) {
+                  ref.read(streamProviderFor(_activeEpisodeId).notifier).reset();
+                  ref.read(streamProviderFor(newId).notifier).reset();
                   setState(() {
                     _activeEpisodeId = newId;
                     _isPlaying = false;
@@ -147,6 +177,8 @@ class _EpisodeDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
               });
             },
             onEpisodeSelect: (newId, ep) {
+              ref.read(streamProviderFor(_activeEpisodeId).notifier).reset();
+              ref.read(streamProviderFor(newId).notifier).reset();
               setState(() {
                 _activeEpisodeId = newId;
                 _isPlaying = false;
@@ -451,25 +483,58 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
   List<PlayerSubtitle>? _subtitles;
   SubtitleTrack? _currentSubtitleTrack;
   String _currentResolutionLabel = 'Auto';
+  bool _hasInitialized = false;
 
   Future<void> _handleResolutionChanged(String url, String label) async {
+    FileLogger.log('[EmbeddedPlayer] Starting resolution switch to: $label (URL: $url)');
     final oldController = _videoController;
     final position = oldController?.value.position ?? Duration.zero;
     final isPlaying = oldController?.value.isPlaying ?? false;
 
+    // 1. Instantly set _videoController to null so the UI stops using it and renders the loading spinner
+    if (mounted) {
+      setState(() {
+        _videoController = null;
+      });
+    }
+
+    // 2. Dispose of the old controller to release all graphic/audio resources (gralloc & audio focus)
+    if (oldController != null) {
+      try {
+        FileLogger.log('[EmbeddedPlayer] Pausing and disposing old controller...');
+        await oldController.pause();
+        await oldController.dispose();
+        FileLogger.log('[EmbeddedPlayer] Old controller disposed successfully.');
+      } catch (e) {
+        FileLogger.log('[EmbeddedPlayer] Failed to dispose old controller: $e');
+      }
+    }
+
     final uri = Uri.parse(url);
     final isHls = uri.path.contains('.m3u8') || url.contains('m3u8') || !uri.path.endsWith('.mp4');
 
-    final newController = VideoPlayerController.networkUrl(
+    final headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Referer': 'https://idlixku.com/',
+    };
+
+    VideoPlayerController newController = VideoPlayerController.networkUrl(
       uri,
       formatHint: isHls ? VideoFormat.hls : null,
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      httpHeaders: headers,
     );
 
     try {
       await newController.initialize();
+      FileLogger.log('[EmbeddedPlayer] New controller initialized successfully.');
+      await newController.setVolume(1.0);
+      FileLogger.log('[EmbeddedPlayer] New controller volume set to 1.0.');
       await newController.seekTo(position);
+      FileLogger.log('[EmbeddedPlayer] New controller seeked to position: $position');
       if (isPlaying) {
         await newController.play();
+        FileLogger.log('[EmbeddedPlayer] New controller playback started.');
       }
 
       if (mounted) {
@@ -478,12 +543,8 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
           _currentResolutionLabel = label;
         });
       }
-
-      if (oldController != null) {
-        await oldController.dispose();
-      }
     } catch (e) {
-      debugPrint('[EpisodeDetailScreen] Quality swap failed: $e');
+      FileLogger.log('[EmbeddedPlayer] Quality swap failed: $e');
       newController.dispose();
     }
   }
@@ -502,6 +563,7 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
 
   @override
   void dispose() {
+    ref.read(streamProviderFor(widget._providerId).notifier).reset();
     // Kembalikan orientasi normal saat keluar
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -531,9 +593,16 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
           url.contains('m3u8') ||
           !uri.path.endsWith('.mp4');
 
+      final headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Referer': 'https://idlixku.com/',
+      };
+
       _videoController = VideoPlayerController.networkUrl(
         uri,
         formatHint: isHls ? VideoFormat.hls : null,
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+        httpHeaders: headers,
       );
       await _videoController!.initialize();
 
@@ -554,6 +623,7 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
         setState(() {
           _subtitles = parsedSubtitles;
           _currentSubtitleTrack = selectedTrack;
+          _hasInitialized = true;
         });
       }
     } catch (e) {
@@ -576,7 +646,7 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
     final streamState = ref.watch(streamProviderFor(widget._providerId));
 
     ref.listen(streamProviderFor(widget._providerId), (prev, next) {
-      if (next.hasResult && _videoController == null) {
+      if (next.hasResult && !_hasInitialized) {
         _initPlayer(next.result!.url, subtitleTracks: next.result!.subtitles);
       }
     });
@@ -586,6 +656,17 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
         .split(' ')
         .map((s) => s.isNotEmpty ? s[0].toUpperCase() + s.substring(1) : '')
         .join(' ');
+
+    if (streamState.hasResult && (_videoController == null || !_videoController!.value.isInitialized)) {
+      return const SizedBox(
+        height: 220,
+        child: Center(
+          child: CircularProgressIndicator(
+            color: Colors.red,
+          ),
+        ),
+      );
+    }
 
     if (_videoController != null && _videoController!.value.isInitialized) {
       return Center(

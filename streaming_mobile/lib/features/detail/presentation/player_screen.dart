@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:streaming_mobile/core/core.dart';
+import 'package:streaming_mobile/core/utils/file_logger.dart';
 import 'package:streaming_mobile/features/detail/data/stream_result.dart';
 import 'package:streaming_mobile/features/detail/domain/detail_provider.dart';
 import 'package:streaming_mobile/shared/atoms/app_text.dart';
@@ -34,25 +35,58 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   List<PlayerSubtitle>? _subtitles;
   SubtitleTrack? _currentSubtitleTrack;
   String _currentResolutionLabel = 'Auto';
+  bool _hasInitialized = false;
 
   Future<void> _handleResolutionChanged(String url, String label) async {
+    FileLogger.log('[PlayerScreen] Starting resolution switch to: $label (URL: $url)');
     final oldController = _videoController;
     final position = oldController?.value.position ?? Duration.zero;
     final isPlaying = oldController?.value.isPlaying ?? false;
 
+    // 1. Instantly set _videoController to null so the UI stops using it and renders the loading spinner
+    if (mounted) {
+      setState(() {
+        _videoController = null;
+      });
+    }
+
+    // 2. Dispose of the old controller to release all graphic/audio resources (gralloc & audio focus)
+    if (oldController != null) {
+      try {
+        FileLogger.log('[PlayerScreen] Pausing and disposing old controller...');
+        await oldController.pause();
+        await oldController.dispose();
+        FileLogger.log('[PlayerScreen] Old controller disposed successfully.');
+      } catch (e) {
+        FileLogger.log('[PlayerScreen] Failed to dispose old controller: $e');
+      }
+    }
+
     final uri = Uri.parse(url);
     final isHls = uri.path.contains('.m3u8') || url.contains('m3u8') || !uri.path.endsWith('.mp4');
 
-    final newController = VideoPlayerController.networkUrl(
+    final headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Referer': 'https://idlixku.com/',
+    };
+
+    VideoPlayerController newController = VideoPlayerController.networkUrl(
       uri,
       formatHint: isHls ? VideoFormat.hls : null,
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      httpHeaders: headers,
     );
 
     try {
       await newController.initialize();
+      FileLogger.log('[PlayerScreen] New controller initialized successfully.');
+      await newController.setVolume(1.0);
+      FileLogger.log('[PlayerScreen] New controller volume set to 1.0.');
       await newController.seekTo(position);
+      FileLogger.log('[PlayerScreen] New controller seeked to position: $position');
       if (isPlaying) {
         await newController.play();
+        FileLogger.log('[PlayerScreen] New controller playback started.');
       }
 
       if (mounted) {
@@ -61,12 +95,8 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
           _currentResolutionLabel = label;
         });
       }
-
-      if (oldController != null) {
-        await oldController.dispose();
-      }
     } catch (e) {
-      debugPrint('[PlayerScreen] Quality swap failed: $e');
+      FileLogger.log('[PlayerScreen] Quality swap failed: $e');
       newController.dispose();
     }
   }
@@ -92,6 +122,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
 
   @override
   void dispose() {
+    ref.read(streamProviderFor(widget.episodeId).notifier).reset();
     // Kembalikan orientasi normal saat keluar
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -120,9 +151,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         url.contains('m3u8') ||
         !uri.path.endsWith('.mp4');
 
+    final headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Referer': 'https://idlixku.com/',
+    };
+
     _videoController = VideoPlayerController.networkUrl(
       uri,
       formatHint: isHls ? VideoFormat.hls : null,
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      httpHeaders: headers,
     );
     await _videoController!.initialize();
 
@@ -143,6 +181,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       setState(() {
         _subtitles = parsedSubtitles;
         _currentSubtitleTrack = selectedTrack;
+        _hasInitialized = true;
       });
     }
   }
@@ -152,7 +191,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final streamState = ref.watch(streamProviderFor(widget.episodeId));
 
     ref.listen(streamProviderFor(widget.episodeId), (prev, next) {
-      if (next.hasResult && _videoController == null) {
+      if (next.hasResult && !_hasInitialized) {
         _initPlayer(next.result!.url, subtitleTracks: next.result!.subtitles);
       }
     });
@@ -203,6 +242,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             _CountdownOverlay(
               streamState: streamState,
               onBack: () => context.pop(),
+            ),
+
+          // ── Loading Spinner for Resolution Switching ──
+          if (streamState.hasResult && (_videoController == null || !_videoController!.value.isInitialized))
+            const Center(
+              child: CircularProgressIndicator(
+                color: Colors.red,
+              ),
             ),
         ],
       ),

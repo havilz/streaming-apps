@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 import 'package:streaming_mobile/core/core.dart';
+import 'package:streaming_mobile/core/utils/file_logger.dart';
 import 'package:streaming_mobile/features/detail/data/stream_result.dart';
 
 class PlayerSubtitle {
@@ -201,87 +201,77 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
     }
 
     final List<HlsResolution> list = [];
-    final client = HttpClient();
-    client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
     try {
       final uri = Uri.parse(dataSource);
-      final request = await client.getUrl(uri);
-      // Add standard desktop browser headers to bypass host blocks / 403 Forbidden
-      request.headers.add('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-      request.headers.add('Referer', 'https://idlixku.com/');
-
-      final response = await request.close();
-      debugPrint('[CustomPlayer] First request response: ${response.statusCode}');
-      
-      if (response.statusCode == 200) {
-        final body = await response.transform(utf8.decoder).join();
-        String m3u8Content = body;
-        Uri currentUri = uri;
-
-        // Check if response is a JSON config wrapping the actual HLS URL
-        final trimmedBody = body.trim();
-        if (trimmedBody.startsWith('{')) {
-          try {
-            final parsedJson = jsonDecode(trimmedBody);
-            if (parsedJson is Map && parsedJson.containsKey('url')) {
-              final nestedUrl = parsedJson['url'] as String;
-              debugPrint('[CustomPlayer] Found nested HLS URL in JSON: $nestedUrl');
-              currentUri = Uri.parse(nestedUrl);
-
-              final request2 = await client.getUrl(currentUri);
-              request2.headers.add('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-              request2.headers.add('Referer', 'https://idlixku.com/');
-              final response2 = await request2.close();
-              debugPrint('[CustomPlayer] Nested request response: ${response2.statusCode}');
-              
-              if (response2.statusCode == 200) {
-                m3u8Content = await response2.transform(utf8.decoder).join();
-              }
-            }
-          } catch (e) {
-            debugPrint('[CustomPlayer] Error parsing nested HLS JSON: $e');
-          }
-        }
-
-        final lines = m3u8Content.replaceAll('\r\n', '\n').split('\n');
-        String? streamInf;
-        for (var line in lines) {
-          final trimmed = line.trim();
-          if (trimmed.isEmpty) continue;
-
-          if (trimmed.startsWith('#EXT-X-STREAM-INF:')) {
-            streamInf = trimmed;
-          } else if (streamInf != null && !trimmed.startsWith('#')) {
-            final absoluteUrl = currentUri.resolve(trimmed).toString();
-            
-            String label = 'Quality';
-            final resMatch = RegExp(r'RESOLUTION=\d+x(\d+)').firstMatch(streamInf);
-            if (resMatch != null) {
-              label = '${resMatch.group(1)}p';
-            } else {
-              final nameMatch = RegExp(r'NAME="([^"]+)"').firstMatch(streamInf);
-              if (nameMatch != null) {
-                label = nameMatch.group(1)!;
-              }
-            }
-
-            if (!list.any((r) => r.url == absoluteUrl)) {
-              list.add(HlsResolution(label: label, url: absoluteUrl));
-            }
-            streamInf = null;
-          }
-        }
-        debugPrint('[CustomPlayer] Successfully parsed ${list.length} HLS qualities.');
+      final body = await CloudflareBypassService.instance.fetchInWebView(dataSource);
+      if (body == null || body.startsWith('ERROR:')) {
+        throw Exception('Failed to fetch master m3u8 via WebView: $body');
       }
-    } catch (e) {
-      debugPrint('[CustomPlayer] HLS parsing exception: $e');
-    } finally {
-      client.close();
+
+      String m3u8Content = body;
+      Uri currentUri = uri;
+
+      // Check if response is a JSON config wrapping the actual HLS URL
+      final trimmedBody = body.trim();
+      if (trimmedBody.startsWith('{')) {
+        try {
+          final parsedJson = jsonDecode(trimmedBody);
+          if (parsedJson is Map && parsedJson.containsKey('url')) {
+            final nestedUrl = parsedJson['url'] as String;
+            debugPrint('[CustomPlayer] Found nested HLS URL in JSON: $nestedUrl');
+            currentUri = Uri.parse(nestedUrl);
+
+            final body2 = await CloudflareBypassService.instance.fetchInWebView(nestedUrl);
+            if (body2 != null && !body2.startsWith('ERROR:')) {
+              m3u8Content = body2;
+            }
+          }
+        } catch (e) {
+          debugPrint('[CustomPlayer] Error parsing nested HLS JSON: $e');
+        }
+      }
+
+      final lines = m3u8Content.replaceAll('\r\n', '\n').split('\n');
+      String? streamInf;
+      for (var line in lines) {
+        final trimmed = line.trim();
+        if (trimmed.isEmpty) continue;
+
+        if (trimmed.startsWith('#EXT-X-STREAM-INF:')) {
+          streamInf = trimmed;
+        } else if (streamInf != null && !trimmed.startsWith('#')) {
+          var resolvedUri = currentUri.resolve(trimmed);
+          if (currentUri.hasQuery) {
+            resolvedUri = resolvedUri.replace(queryParameters: currentUri.queryParameters);
+          }
+          final absoluteUrl = resolvedUri.toString();
+          
+          String label = 'Quality';
+          final resMatch = RegExp(r'RESOLUTION=\d+x(\d+)').firstMatch(streamInf);
+          if (resMatch != null) {
+            label = '${resMatch.group(1)}p';
+          } else {
+            final nameMatch = RegExp(r'NAME="([^"]+)"').firstMatch(streamInf);
+            if (nameMatch != null) {
+              label = nameMatch.group(1)!;
+            }
+          }
+
+          if (!list.any((r) => r.url == absoluteUrl)) {
+            list.add(HlsResolution(label: label, url: absoluteUrl));
+          }
+          streamInf = null;
+        }
+      }
+      debugPrint('[CustomPlayer] Successfully parsed ${list.length} HLS qualities.');
+
       if (mounted) {
         setState(() {
           _availableResolutions = list;
         });
       }
+    } catch (e) {
+      debugPrint('[CustomPlayer] HLS parsing exception: $e');
     }
   }
 
@@ -1033,7 +1023,7 @@ class FullScreenPlayerPage extends StatefulWidget {
 }
 
 class _FullScreenPlayerPageState extends State<FullScreenPlayerPage> {
-  late VideoPlayerController _activeController;
+  VideoPlayerController? _activeController;
   late String _activeResolutionLabel;
 
   @override
@@ -1049,23 +1039,55 @@ class _FullScreenPlayerPageState extends State<FullScreenPlayerPage> {
   }
 
   Future<void> _changeResolution(String url, String label) async {
+    FileLogger.log('[FullScreenPlayerPage] Starting resolution switch to: $label (URL: $url)');
     final oldController = _activeController;
-    final position = oldController.value.position;
-    final isPlaying = oldController.value.isPlaying;
+    final position = oldController?.value.position ?? Duration.zero;
+    final isPlaying = oldController?.value.isPlaying ?? false;
+
+    // 1. Instantly set _activeController to null so the UI stops using it and renders the loading spinner
+    if (mounted) {
+      setState(() {
+        _activeController = null;
+      });
+    }
+
+    // 2. Dispose of the old controller to release all graphic/audio resources (gralloc & audio focus)
+    if (oldController != null) {
+      try {
+        FileLogger.log('[FullScreenPlayerPage] Pausing and disposing old controller...');
+        await oldController.pause();
+        await oldController.dispose();
+        FileLogger.log('[FullScreenPlayerPage] Old controller disposed successfully.');
+      } catch (e) {
+        FileLogger.log('[FullScreenPlayerPage] Failed to dispose old controller: $e');
+      }
+    }
 
     final uri = Uri.parse(url);
     final isHls = uri.path.contains('.m3u8') || url.contains('m3u8') || !uri.path.endsWith('.mp4');
 
-    final newController = VideoPlayerController.networkUrl(
+    final headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Referer': 'https://idlixku.com/',
+    };
+
+    VideoPlayerController newController = VideoPlayerController.networkUrl(
       uri,
       formatHint: isHls ? VideoFormat.hls : null,
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      httpHeaders: headers,
     );
 
     try {
       await newController.initialize();
+      FileLogger.log('[FullScreenPlayerPage] New controller initialized successfully.');
+      await newController.setVolume(1.0);
+      FileLogger.log('[FullScreenPlayerPage] New controller volume set to 1.0.');
       await newController.seekTo(position);
+      FileLogger.log('[FullScreenPlayerPage] New controller seeked to position: $position');
       if (isPlaying) {
         await newController.play();
+        FileLogger.log('[FullScreenPlayerPage] New controller playback started.');
       }
 
       if (widget.onFullScreenControllerChanged != null) {
@@ -1078,11 +1100,8 @@ class _FullScreenPlayerPageState extends State<FullScreenPlayerPage> {
           _activeResolutionLabel = label;
         });
       }
-
-      // Safe to dispose the old controller now
-      await oldController.dispose();
     } catch (e) {
-      debugPrint('[FullScreenPlayerPage] Resolution switch failed: $e');
+      FileLogger.log('[FullScreenPlayerPage] Resolution switch failed: $e');
       newController.dispose();
     }
   }
@@ -1100,19 +1119,25 @@ class _FullScreenPlayerPageState extends State<FullScreenPlayerPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: CustomVideoPlayer(
-        controller: _activeController,
-        title: widget.title,
-        subtitles: widget.subtitles,
-        subtitleTracks: widget.subtitleTracks,
-        currentSubtitleTrack: widget.currentSubtitleTrack,
-        onSubtitleTrackChanged: widget.onSubtitleTrackChanged,
-        isFullScreen: true,
-        onBack: () => Navigator.pop(context),
-        currentResolutionLabel: _activeResolutionLabel,
-        onResolutionChanged: _changeResolution,
-        initialResolutions: widget.initialResolutions,
-      ),
+      body: _activeController == null
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: Colors.red,
+              ),
+            )
+          : CustomVideoPlayer(
+              controller: _activeController!,
+              title: widget.title,
+              subtitles: widget.subtitles,
+              subtitleTracks: widget.subtitleTracks,
+              currentSubtitleTrack: widget.currentSubtitleTrack,
+              onSubtitleTrackChanged: widget.onSubtitleTrackChanged,
+              isFullScreen: true,
+              onBack: () => Navigator.pop(context),
+              currentResolutionLabel: _activeResolutionLabel,
+              onResolutionChanged: _changeResolution,
+              initialResolutions: widget.initialResolutions,
+            ),
     );
   }
 }

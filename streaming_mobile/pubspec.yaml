@@ -43,6 +43,7 @@ dependencies:
   chewie: ^1.14.1
   audioplayers: ^6.0.0
   wakelock_plus: ^1.6.1
+  flutter_inappwebview: ^6.1.5
 
 dev_dependencies:
   flutter_test:
