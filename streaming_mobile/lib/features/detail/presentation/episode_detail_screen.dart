@@ -90,9 +90,11 @@ class _EpisodeDetailScreenState extends ConsumerState<EpisodeDetailScreen> {
       if (series != null && !_hasSyncedSeries) {
         _hasSyncedSeries = true;
         ClientSyncService.syncSeriesEpisodes(series.id, series.slug).then((_) {
-          if (mounted) {
-            ref.invalidate(episodesProvider((seriesId: series.id, season: activeSeason)));
-          }
+          try {
+            if (mounted) {
+              ref.invalidate(episodesProvider((seriesId: series.id, season: activeSeason)));
+            }
+          } catch (_) {}
         });
       }
     });
@@ -480,12 +482,17 @@ class EmbeddedPlayer extends ConsumerStatefulWidget {
 
 class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
   VideoPlayerController? _videoController;
+  VideoPlayerController? _pendingController; // tracks in-flight controller during resolution swap
   List<PlayerSubtitle>? _subtitles;
   SubtitleTrack? _currentSubtitleTrack;
   String _currentResolutionLabel = 'Auto';
   bool _hasInitialized = false;
+  bool _isDisposed = false;
+  // Store notifier reference before dispose — calling ref.read() in dispose() is unsafe in Riverpod
+  StreamUnlockNotifier? _streamNotifier;
 
   Future<void> _handleResolutionChanged(String url, String label) async {
+    if (_isDisposed) return;
     FileLogger.log('[EmbeddedPlayer] Starting resolution switch to: $label (URL: $url)');
     final oldController = _videoController;
     final position = oldController?.value.position ?? Duration.zero;
@@ -498,16 +505,20 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
       });
     }
 
-    // 2. Dispose of the old controller to release all graphic/audio resources (gralloc & audio focus)
+    // 2. Pause and mute the old controller (releasing audio focus pro-actively)
     if (oldController != null) {
       try {
-        FileLogger.log('[EmbeddedPlayer] Pausing and disposing old controller...');
+        FileLogger.log('[EmbeddedPlayer] Pausing and muting old controller...');
         await oldController.pause();
-        await oldController.dispose();
-        FileLogger.log('[EmbeddedPlayer] Old controller disposed successfully.');
+        await oldController.setVolume(0.0);
       } catch (e) {
-        FileLogger.log('[EmbeddedPlayer] Failed to dispose old controller: $e');
+        FileLogger.log('[EmbeddedPlayer] Failed to pause/mute old controller: $e');
       }
+    }
+
+    if (_isDisposed) {
+      oldController?.dispose();
+      return;
     }
 
     final uri = Uri.parse(url);
@@ -518,15 +529,51 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
       'Referer': 'https://idlixku.com/',
     };
 
-    VideoPlayerController newController = VideoPlayerController.networkUrl(
-      uri,
-      formatHint: isHls ? VideoFormat.hls : null,
-      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-      httpHeaders: headers,
-    );
+    VideoPlayerController newController;
+    if (isHls && label != 'Auto' && label != 'Otomatis') {
+      try {
+        final tempDir = Directory.systemTemp;
+        final tempFile = File('${tempDir.path}/temp_master_${label}.m3u8');
+        final content = '''
+#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=1500000,RESOLUTION=1280x720,CODECS="avc1.4d401f,mp4a.40.2"
+$url
+''';
+        await tempFile.writeAsString(content);
+        FileLogger.log('[EmbeddedPlayer] Created temporary master playlist at: ${tempFile.path}');
+        newController = VideoPlayerController.file(
+          tempFile,
+          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+          httpHeaders: headers,
+        );
+      } catch (e) {
+        FileLogger.log('[EmbeddedPlayer] Failed to create temporary master playlist: $e, falling back to network url');
+        newController = VideoPlayerController.networkUrl(
+          uri,
+          formatHint: VideoFormat.hls,
+          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+          httpHeaders: headers,
+        );
+      }
+    } else {
+      newController = VideoPlayerController.networkUrl(
+        uri,
+        formatHint: isHls ? VideoFormat.hls : null,
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+        httpHeaders: headers,
+      );
+    }
+
+    _pendingController = newController;
 
     try {
       await newController.initialize();
+      if (_isDisposed) {
+        newController.dispose();
+        oldController?.dispose();
+        _pendingController = null;
+        return;
+      }
       FileLogger.log('[EmbeddedPlayer] New controller initialized successfully.');
       await newController.setVolume(1.0);
       FileLogger.log('[EmbeddedPlayer] New controller volume set to 1.0.');
@@ -537,38 +584,81 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
         FileLogger.log('[EmbeddedPlayer] New controller playback started.');
       }
 
-      if (mounted) {
+      if (mounted && !_isDisposed) {
         setState(() {
           _videoController = newController;
           _currentResolutionLabel = label;
+        });
+        _pendingController = null;
+      } else {
+        newController.dispose();
+        _pendingController = null;
+      }
+
+      // Dispose of the old controller asynchronously after swapping
+      if (oldController != null) {
+        Future.delayed(const Duration(milliseconds: 200), () {
+          oldController.dispose().catchError((e) {
+            FileLogger.log('[EmbeddedPlayer] Error disposing old controller: $e');
+          });
         });
       }
     } catch (e) {
       FileLogger.log('[EmbeddedPlayer] Quality swap failed: $e');
       newController.dispose();
+      _pendingController = null;
+      
+      // Fail-safe recovery: restore the old controller
+      if (!_isDisposed && oldController != null) {
+        try {
+          await oldController.setVolume(1.0);
+          if (isPlaying) {
+            await oldController.play();
+          }
+        } catch (restoreError) {
+          FileLogger.log('[EmbeddedPlayer] Failed to restore old controller: $restoreError');
+        }
+      }
+      
+      if (mounted && !_isDisposed) {
+        setState(() {
+          _videoController = oldController;
+        });
+      } else {
+        oldController?.dispose();
+      }
     }
   }
 
   @override
   void initState() {
     super.initState();
+    // Cache notifier ref here — safe to use in dispose()
+    _streamNotifier = ref.read(streamProviderFor(widget._providerId).notifier);
     WakelockPlus.enable();
     // Mulai unlock stream tanpa mengunci orientasi ke landscape
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref
           .read(streamProviderFor(widget._providerId).notifier)
-          .unlock(slug: widget.slug, isMovie: widget.isMovie);
+          .unlock(slug: widget.slug, isMovie: widget.isMovie, context: context);
     });
   }
 
   @override
   void dispose() {
-    ref.read(streamProviderFor(widget._providerId).notifier).reset();
+    _isDisposed = true;
+    // Use pre-stored notifier — safe because it doesn't go through ref
+    try { _streamNotifier?.reset(); } catch (_) {}
     // Kembalikan orientasi normal saat keluar
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     WakelockPlus.disable();
+    // Pause immediately to silence audio before releasing resources
+    _videoController?.pause();
     _videoController?.dispose();
+    // Also dispose any in-flight pending controller from a resolution swap
+    _pendingController?.pause();
+    _pendingController?.dispose();
     super.dispose();
   }
 

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
@@ -1051,15 +1052,14 @@ class _FullScreenPlayerPageState extends State<FullScreenPlayerPage> {
       });
     }
 
-    // 2. Dispose of the old controller to release all graphic/audio resources (gralloc & audio focus)
+    // 2. Pause and mute the old controller (releasing audio focus pro-actively)
     if (oldController != null) {
       try {
-        FileLogger.log('[FullScreenPlayerPage] Pausing and disposing old controller...');
+        FileLogger.log('[FullScreenPlayerPage] Pausing and muting old controller...');
         await oldController.pause();
-        await oldController.dispose();
-        FileLogger.log('[FullScreenPlayerPage] Old controller disposed successfully.');
+        await oldController.setVolume(0.0);
       } catch (e) {
-        FileLogger.log('[FullScreenPlayerPage] Failed to dispose old controller: $e');
+        FileLogger.log('[FullScreenPlayerPage] Failed to pause/mute old controller: $e');
       }
     }
 
@@ -1071,12 +1071,40 @@ class _FullScreenPlayerPageState extends State<FullScreenPlayerPage> {
       'Referer': 'https://idlixku.com/',
     };
 
-    VideoPlayerController newController = VideoPlayerController.networkUrl(
-      uri,
-      formatHint: isHls ? VideoFormat.hls : null,
-      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-      httpHeaders: headers,
-    );
+    VideoPlayerController newController;
+    if (isHls && label != 'Auto' && label != 'Otomatis') {
+      try {
+        final tempDir = Directory.systemTemp;
+        final tempFile = File('${tempDir.path}/temp_master_$label.m3u8');
+        final content = '''
+#EXTM3U
+#EXT-X-STREAM-INF:BANDWIDTH=1500000,RESOLUTION=1280x720,CODECS="avc1.4d401f,mp4a.40.2"
+$url
+''';
+        await tempFile.writeAsString(content);
+        FileLogger.log('[FullScreenPlayerPage] Created temporary master playlist at: ${tempFile.path}');
+        newController = VideoPlayerController.file(
+          tempFile,
+          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+          httpHeaders: headers,
+        );
+      } catch (e) {
+        FileLogger.log('[FullScreenPlayerPage] Failed to create temporary master playlist: $e, falling back to network url');
+        newController = VideoPlayerController.networkUrl(
+          uri,
+          formatHint: VideoFormat.hls,
+          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+          httpHeaders: headers,
+        );
+      }
+    } else {
+      newController = VideoPlayerController.networkUrl(
+        uri,
+        formatHint: isHls ? VideoFormat.hls : null,
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+        httpHeaders: headers,
+      );
+    }
 
     try {
       await newController.initialize();
@@ -1100,9 +1128,36 @@ class _FullScreenPlayerPageState extends State<FullScreenPlayerPage> {
           _activeResolutionLabel = label;
         });
       }
+
+      // Dispose of the old controller asynchronously after swapping
+      if (oldController != null) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          oldController.dispose().catchError((e) {
+            FileLogger.log('[FullScreenPlayerPage] Error disposing old controller: $e');
+          });
+        });
+      }
     } catch (e) {
       FileLogger.log('[FullScreenPlayerPage] Resolution switch failed: $e');
       newController.dispose();
+
+      // Fail-safe recovery: restore the old controller
+      if (oldController != null) {
+        try {
+          await oldController.setVolume(1.0);
+          if (isPlaying) {
+            await oldController.play();
+          }
+        } catch (restoreError) {
+          FileLogger.log('[FullScreenPlayerPage] Failed to restore old controller: $restoreError');
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _activeController = oldController;
+        });
+      }
     }
   }
 
