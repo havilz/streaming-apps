@@ -380,7 +380,6 @@ class WebViewSession {
           } catch (_) {}
         }
       }
-      print('[WebViewSession] Pre-injected ${svc.cookieString!.split('; ').length} cookies before load.');
     }
 
     _headless = HeadlessInAppWebView(
@@ -405,7 +404,6 @@ class WebViewSession {
         if (currentUrl.contains('challenges.cloudflare.com') ||
             currentUrl.contains('/cdn-cgi/challenge') ||
             currentUrl.contains('/cdn-cgi/l/chk')) {
-          print('[WebViewSession] Challenge page detected after pre-injection. Re-injecting cookies and reloading...');
           final service = CloudflareBypassService.instance;
           if (service.hasValidCookies && service.cookieString != null) {
             final cookieManager = CookieManager.instance();

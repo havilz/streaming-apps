@@ -257,4 +257,28 @@ Daftar ini digunakan untuk memantau progress pengerjaan aplikasi mobile. Setiap 
 - [x] Integrasikan parameter `context` saat memicu `unlock()` di `player_screen.dart` dan `episode_detail_screen.dart` agar visible challenge dialog dapat ditampilkan.
 - [x] Jalankan `flutter analyze` untuk memastikan tidak ada kesalahan sintaks.
 
+---
 
+### Task 15. Resolusi Masalah Suara Hilang & Crash 'VideoPlayerController was used after being disposed' saat Ganti Kualitas
+- [x] Simpan referensi provider notifier di `initState()` pada `player_screen.dart` dan `episode_detail_screen.dart` untuk menghindari error `Bad State: using ref in unmounted widget` di Riverpod saat `dispose()`.
+- [x] Pindahkan `oldController.dispose()` ke dalam `WidgetsBinding.instance.addPostFrameCallback` agar ditunda sampai frame render selesai, mencegah *used after being disposed* crash saat unmounting widget.
+- [x] Bebaskan alokasi `AudioTrack` secara instan dengan memanggil `pause()` dan `setVolume(0.0)` pada old controller sesaat sebelum inisialisasi controller baru.
+- [x] Hilangkan gear selector resolusi manual di UI `CustomVideoPlayer` dan serahkan pemutaran ke ABR (Adaptive Bitrate) HLS ExoPlayer bawaan Android agar pergantian resolusi berjalan otomatis di latar belakang tanpa memicu pergantian controller.
+
+---
+
+### Task 16. Perbaikan Supabase JIT Sync Duplikasi Episode & Pembersihan Episode Sampah (Agent Kim Reactivated)
+- [x] Tambahkan parameter `onConflict` dengan target `'series_id,season_number,episode_number'` pada operasi `.upsert()` episodes Supabase untuk mencegah crash akibat duplikasi key unik saat ID episode dari IDLIX berubah.
+- [x] Implementasikan cleanup step menggunakan query `.not('episode_number', 'in', ...)` untuk menghapus episode usang (sampah) yang ada di database lokal tapi tidak lagi dikembalikan oleh API detail (misal episode 6 s/d 10 pada series *Agent Kim Reactivated*).
+- [x] Integrasikan JIT Sync series episode langsung saat halaman detail Series dibuka (`detail_screen.dart`), bukan hanya saat tombol Play ditekan.
+
+---
+
+### Task 17. Penamaan Aplikasi Asli, Pembersihan Prints, & Full Test Suite (Unit/Widget/Integration Tests)
+- [x] Kembalikan label aplikasi Android di `AndroidManifest.xml` dari `StreamVaultDebug` ke nama asli **StreamVault**.
+- [x] Hapus console print logs tambahan di `cloudflare_bypass.dart` agar log konsol produksi bersih.
+- [x] Tambahkan library `integration_test` ke `dev_dependencies` di `pubspec.yaml` dan jalankan `flutter pub get`.
+- [x] Buat pengujian unit (`test/unit_test.dart`) untuk memverifikasi fungsionalitas parser VTT Subtitle.
+- [x] Buat pengujian widget (`test/widget_test.dart`) untuk memverifikasi UI `ErrorView` dan tombol coba lagi.
+- [x] Buat pengujian integrasi (`integration_test/app_test.dart`) untuk memverifikasi startup aplikasi dan loading awal.
+- [x] Jalankan seluruh test suite dan pastikan semua pengujian lolos (passed).
