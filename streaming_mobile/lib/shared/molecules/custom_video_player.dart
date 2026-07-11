@@ -901,13 +901,7 @@ class _CustomVideoPlayerState extends State<CustomVideoPlayer> {
                             onPressed: _showSubtitleSelector,
                           ),
 
-                        // Resolution Selector Gear Button (available if parsed HLS resolutions exist)
-                        if (_availableResolutions.isNotEmpty && widget.onResolutionChanged != null)
-                          IconButton(
-                            iconSize: widget.isFullScreen ? 24 : 18,
-                            icon: const Icon(Icons.settings_outlined, color: Colors.white),
-                            onPressed: _showResolutionSelector,
-                          ),
+                        // Resolution Selector Gear Button is disabled. HLS ABR handles stream qualities automatically.
 
                         const Spacer(),
 

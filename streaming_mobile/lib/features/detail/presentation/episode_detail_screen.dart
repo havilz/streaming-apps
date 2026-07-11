@@ -505,7 +505,9 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
       });
     }
 
-    // 2. Pause and mute the old controller (releasing audio focus pro-actively)
+    // 2. Pause and mute the old controller to free the AudioTrack/AudioSession.
+    // We do NOT dispose it yet because the widget tree may still hold references/listeners to it
+    // during the rebuild transition. Disposing it now will cause a crash.
     if (oldController != null) {
       try {
         FileLogger.log('[EmbeddedPlayer] Pausing and muting old controller...');
@@ -529,40 +531,12 @@ class _EmbeddedPlayerState extends ConsumerState<EmbeddedPlayer> {
       'Referer': 'https://idlixku.com/',
     };
 
-    VideoPlayerController newController;
-    if (isHls && label != 'Auto' && label != 'Otomatis') {
-      try {
-        final tempDir = Directory.systemTemp;
-        final tempFile = File('${tempDir.path}/temp_master_${label}.m3u8');
-        final content = '''
-#EXTM3U
-#EXT-X-STREAM-INF:BANDWIDTH=1500000,RESOLUTION=1280x720,CODECS="avc1.4d401f,mp4a.40.2"
-$url
-''';
-        await tempFile.writeAsString(content);
-        FileLogger.log('[EmbeddedPlayer] Created temporary master playlist at: ${tempFile.path}');
-        newController = VideoPlayerController.file(
-          tempFile,
-          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-          httpHeaders: headers,
-        );
-      } catch (e) {
-        FileLogger.log('[EmbeddedPlayer] Failed to create temporary master playlist: $e, falling back to network url');
-        newController = VideoPlayerController.networkUrl(
-          uri,
-          formatHint: VideoFormat.hls,
-          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-          httpHeaders: headers,
-        );
-      }
-    } else {
-      newController = VideoPlayerController.networkUrl(
-        uri,
-        formatHint: isHls ? VideoFormat.hls : null,
-        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-        httpHeaders: headers,
-      );
-    }
+    VideoPlayerController newController = VideoPlayerController.networkUrl(
+      uri,
+      formatHint: isHls ? VideoFormat.hls : null,
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
+      httpHeaders: headers,
+    );
 
     _pendingController = newController;
 
@@ -570,7 +544,6 @@ $url
       await newController.initialize();
       if (_isDisposed) {
         newController.dispose();
-        oldController?.dispose();
         _pendingController = null;
         return;
       }
@@ -595,11 +568,11 @@ $url
         _pendingController = null;
       }
 
-      // Dispose of the old controller asynchronously after swapping
+      // 3. Now that the new controller is active/set, safely dispose the old controller in the next frame.
       if (oldController != null) {
-        Future.delayed(const Duration(milliseconds: 200), () {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
           oldController.dispose().catchError((e) {
-            FileLogger.log('[EmbeddedPlayer] Error disposing old controller: $e');
+            FileLogger.log('[EmbeddedPlayer] Failed to dispose old controller: $e');
           });
         });
       }
