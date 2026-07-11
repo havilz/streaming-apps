@@ -145,6 +145,8 @@ class _SeriesBody extends ConsumerStatefulWidget {
 }
 
 class _SeriesBodyState extends ConsumerState<_SeriesBody> {
+  bool _hasSynced = false;
+
   @override
   void initState() {
     super.initState();
@@ -163,6 +165,19 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
   @override
   Widget build(BuildContext context) {
     final activeSeason = ref.watch(activeSeasonProviderFor(widget.slug));
+
+    if (!_hasSynced) {
+      _hasSynced = true;
+      // Trigger sync for this series immediately when the detail page is opened
+      ClientSyncService.syncSeriesEpisodes(widget.series.id, widget.series.slug).then((_) {
+        if (mounted) {
+          ref.invalidate(episodesProvider((seriesId: widget.series.id, season: activeSeason)));
+          // Also invalidate series detail in case number of seasons or other metadata was updated
+          ref.invalidate(seriesDetailProvider(widget.slug));
+        }
+      }).catchError((_) {});
+    }
+
     final episodes = ref.watch(
       episodesProvider((seriesId: widget.series.id, season: activeSeason)),
     );

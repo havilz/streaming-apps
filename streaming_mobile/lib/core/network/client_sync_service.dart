@@ -152,21 +152,33 @@ class ClientSyncService {
           if (epBody != null && !epBody.startsWith('ERROR:')) {
             final epData = jsonDecode(epBody) as Map<String, dynamic>;
             final episodes = (epData['season']?['episodes'] as List?) ?? [];
-
+            final activeEpNumbers = <int>[];
             for (var ep in episodes) {
+              final epNum = (ep['episodeNumber'] as num?)?.toInt() ?? 1;
+              activeEpNumbers.add(epNum);
               await supabaseClient.from('episodes').upsert({
                 'id': ep['id'].toString(),
                 'series_id': seriesId,
                 'season_number': seasonNumber,
-                'episode_number': ep['episodeNumber'] ?? 1,
+                'episode_number': epNum,
                 'title': ep['name'],
                 'overview': ep['overview'],
                 'still_path': ep['stillPath'],
                 'runtime': ep['runtime'] != null ? int.tryParse(ep['runtime'].toString()) : null,
                 'air_date': ep['airDate'],
-              });
+              }, onConflict: 'series_id,season_number,episode_number');
             }
-            print('[ClientSyncService] Synced ${episodes.length} episodes for season $seasonNumber of $seriesSlug.');
+
+            // Cleanup any stale/leftover episodes in local db that are no longer returned by the API
+            if (activeEpNumbers.isNotEmpty) {
+              await supabaseClient
+                  .from('episodes')
+                  .delete()
+                  .eq('series_id', seriesId)
+                  .eq('season_number', seasonNumber)
+                  .not('episode_number', 'in', '(${activeEpNumbers.join(",")})');
+            }
+            print('[ClientSyncService] Synced and cleaned up ${episodes.length} episodes for season $seasonNumber of $seriesSlug.');
           }
           await Future.delayed(const Duration(milliseconds: 200));
         }
