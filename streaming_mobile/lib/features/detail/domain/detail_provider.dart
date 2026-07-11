@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:streaming_mobile/core/core.dart';
 import 'package:streaming_mobile/features/detail/data/data.dart';
 import 'package:streaming_mobile/features/home/data/movie_model.dart';
 
@@ -144,17 +146,27 @@ class StreamState {
 // dan kita butuh episodeId sebagai parameter, kita pakai provider
 // cache manual agar setiap episodeId punya instance terpisah.
 
-class StreamNotifier extends Notifier<StreamState> {
-  StreamNotifier(this._episodeId);
+class StreamUnlockNotifier extends Notifier<StreamState> {
+  StreamUnlockNotifier(this._episodeId);
 
   final String _episodeId;
 
   @override
   StreamState build() => const StreamState();
 
-  Future<void> unlock({required String slug, required bool isMovie}) async {
+  Future<void> unlock({required String slug, required bool isMovie, BuildContext? context}) async {
     if (state.isLoading) return;
     state = const StreamState(isLoading: true, step: 1);
+
+    try {
+      final baseUrl = const String.fromEnvironment('IDLIX_BASE_URL', defaultValue: 'https://z2.idlixku.com');
+      await CloudflareBypassService.instance.ensureBypass(baseUrl, context: context);
+    } catch (e) {
+      print('[StreamUnlockNotifier] Failed to harvest Cloudflare cookies: $e');
+      state = const StreamState(error: 'Gagal menembus proteksi Cloudflare. Coba lagi.');
+      return;
+    }
+
     state = state.copyWith(step: 2);
 
     final result = await ref
@@ -169,16 +181,16 @@ class StreamNotifier extends Notifier<StreamState> {
   void reset() => state = const StreamState();
 }
 
-final _streamCache = <String, NotifierProvider<StreamNotifier, StreamState>>{};
+final _streamCache = <String, NotifierProvider<StreamUnlockNotifier, StreamState>>{};
 
 /// Ambil atau buat provider stream untuk [episodeId] tertentu.
-NotifierProvider<StreamNotifier, StreamState> streamProviderFor(
+NotifierProvider<StreamUnlockNotifier, StreamState> streamProviderFor(
   String episodeId,
 ) {
   return _streamCache.putIfAbsent(
     episodeId,
-    () => NotifierProvider<StreamNotifier, StreamState>(
-      () => StreamNotifier(episodeId),
+    () => NotifierProvider<StreamUnlockNotifier, StreamState>(
+      () => StreamUnlockNotifier(episodeId),
     ),
   );
 }

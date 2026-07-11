@@ -1,6 +1,7 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:streaming_mobile/features/detail/data/detail_repository.dart';
+import 'package:streaming_mobile/core/core.dart';
+import 'package:streaming_mobile/features/home/domain/domain.dart';
 
 enum SyncStatus { idle, loading, success, error }
 
@@ -22,19 +23,20 @@ class SyncNotifier extends Notifier<SyncState> {
     state = const SyncState(status: SyncStatus.loading);
 
     try {
-      final secret = dotenv.env['SYNC_SECRET'] ?? '';
-      final repo = ref.read(_syncRepoProvider);
-      final result = await repo.triggerSync(mode: mode, secret: secret);
-
-      if (result == null) {
-        state = const SyncState(
-          status: SyncStatus.error,
-          message: 'Gagal terhubung ke server sync',
-        );
-        return;
+      // Force bypass cache/cooldown for manual pull-to-refresh
+      await ClientSyncService.markGlobalSynced(); // Force reset cooldown
+      final tempFile = File('${Directory.systemTemp.path}/last_sync_time.txt');
+      if (await tempFile.exists()) {
+        await tempFile.delete(); // Delete file to bypass cooldown
       }
 
-      state = SyncState(status: SyncStatus.success, message: result.message);
+      await ClientSyncService.syncGlobal();
+      await ref.read(homeProvider.notifier).reload();
+
+      state = const SyncState(
+        status: SyncStatus.success,
+        message: 'Sinkronisasi katalog berhasil',
+      );
     } catch (e) {
       state = SyncState(status: SyncStatus.error, message: e.toString());
     }
@@ -45,8 +47,4 @@ class SyncNotifier extends Notifier<SyncState> {
 
 final syncProvider = NotifierProvider<SyncNotifier, SyncState>(
   SyncNotifier.new,
-);
-
-final _syncRepoProvider = Provider<DetailRepository>(
-  (_) => const DetailRepository(),
 );

@@ -206,5 +206,79 @@ Daftar ini digunakan untuk memantau progress pengerjaan aplikasi mobile. Setiap 
 - [x] Implementasi seksi "New Updated" pada beranda utama (`HomeScreen`), halaman film (`MovieScreen`), dan halaman serial TV (`SeriesScreen`) dengan filter interaktif untuk mempermudah verifikasi sinkronisasi konten
 - [x] Penambahan pintasan langsung ke rincian episode (`EpisodeDetailScreen`) ketika menekan kartu episode pada seksi "New Updated"
 
+---
 
+### Task 10. Perbaikan Sound menghilang pada saat ganti resolusi video
+- [x] Hentikan (pause) dan senyapkan (mute/setVolume 0.0) controller video lama sesaat sebelum menginisialisasi controller baru di `player_screen.dart`, `episode_detail_screen.dart`, dan `custom_video_player.dart`
+- [x] Konfigurasi seluruh inisialisasi controller dengan opsi `mixWithOthers: true` pada `VideoPlayerOptions`
+- [x] Panggil fungsi `setVolume(1.0)` secara eksplisit segera setelah controller video baru selesai diinisialisasi
+- [x] Implementasikan penanganan error (fail-safe recovery) agar jika inisialisasi controller baru gagal, volume controller lama dikembalikan ke `1.0` dan diputar kembali secara otomatis
 
+---
+
+### Task 11. Perbaikan Masalah Gagal Memutar Video setelah 1 hari penginstallan
+- [x] Lakukan investigasi penyebab kegagalan stream dengan memanggil Edge Function Supabase Cloud secara terprogram (ditemukan error 403 / Cloudflare Challenge)
+- [x] Tambahkan package `flutter_inappwebview: ^6.1.5` ke `pubspec.yaml`
+- [x] Buat class `CloudflareBypassService` di client untuk melakukan cookie harvesting (`cf_clearance` & User-Agent) secara headless/tersembunyi
+- [x] Refaktor `DetailRepository.unlockStream` untuk menjalankan 3-step Pentos flow secara lokal di Dart dengan cookie hasil panen
+- [x] Implementasikan **Global Background Sync** (Level 1) pada saat Home Screen dimuat, lengkap dengan cooldown throttling **30 menit**
+- [x] Implementasikan **Just-In-Time (JIT) Targeted Sync** (Level 2) pada saat halaman Detail Series dibuka, lengkap dengan cooldown throttling **5 menit**
+- [x] Uji fungsionalitas pemutaran video dan sinkronisasi konten baru di perangkat tanpa local dev backend untuk memastikan 100% bypass berhasil secara live
+
+---
+
+### Task 12. Optimasi Loading Player, Resolusi Buffering, dan Pencegahan Rate Limit 429
+- [x] Implementasikan `WebViewSession` pada `cloudflare_bypass.dart` untuk menjaga persistent headless WebView selama Pentos Flow berjalan.
+- [x] Refaktor `DetailRepository.unlockStream` menggunakan single `WebViewSession` untuk memotong overhead waktu loading dari ~30s ke ~11s.
+- [x] Ganti parsing `HttpClient` di `custom_video_player.dart` dengan `fetchInWebView` untuk mencegah error 403 pada resolusi master.
+- [x] Perbaiki logika parsing URL agar mempertahankan parameter token (`?t=...`) untuk URL resolusi anak.
+- [x] Integrasikan `httpHeaders` lengkap (`User-Agent` & `Referer`) ke seluruh inisialisasi controller kualitas baru (`VideoPlayerController.networkUrl`).
+- [x] Pindahkan logika targeted JIT sync keluar dari method `build` widget anak ke State induk halaman detail untuk mencegah spam request berulang (menghindari error 429).
+- [x] Implementasikan pembersihan cache stream provider (`reset()`) di dalam event `dispose()`, `didUpdateWidget()`, dan perpindahan episode guna mencegah URL HLS CDN kedaluwarsa diputar ulang.
+
+---
+
+### Task 13. Restorasi Penanganan Hilang Suara Saat Ganti Resolusi (Checkpoint 14)
+- [x] Impor kembali `dart:io` di berkas `custom_video_player.dart`.
+- [x] Kembalikan pembuatan virtual master HLS playlist (.m3u8) dengan tag `CODECS="avc1.4d401f,mp4a.40.2"` di `custom_video_player.dart`, `episode_detail_screen.dart`, dan `player_screen.dart`.
+- [x] Lewatkan `httpHeaders` berisi browser headers (`User-Agent` & `Referer`) ke dalam instansiasi `VideoPlayerController.file` agar request sub-playlist tidak terblokir 403.
+- [x] Lakukan penanganan swap proaktif (pause/mute controller lama, inisialisasi controller baru, pasang volume 1.0, lalu dispose controller lama).
+- [x] Tambahkan penanganan *fail-safe recovery* untuk mengaktifkan kembali controller lama jika inisialisasi kualitas baru gagal.
+- [x] Jalankan static analysis `flutter analyze` untuk memastikan kode bersih.
+
+---
+
+### Task 14. Hybrid Cloudflare Bypass (Penanganan Turnstile Interaktif)
+- [x] Tambahkan import `package:flutter/material.dart` di berkas `cloudflare_bypass.dart` dan `detail_provider.dart`.
+- [x] Refaktor `ensureBypass` untuk mencoba bypass headless terlebih dahulu selama 10 detik.
+- [x] Implementasikan dialog bottom sheet interaktif `_showVisibleBypassDialog` berisi visible webview jika headless bypass gagal.
+- [x] Pastikan dialog bypass menutup sendiri secara otomatis (`auto-dismiss`) setelah cookies/UA berhasil dipanen.
+- [x] Perbarui signature method `unlock()` di `detail_provider.dart` agar menerima parameter optional `BuildContext`.
+- [x] Integrasikan parameter `context` saat memicu `unlock()` di `player_screen.dart` dan `episode_detail_screen.dart` agar visible challenge dialog dapat ditampilkan.
+- [x] Jalankan `flutter analyze` untuk memastikan tidak ada kesalahan sintaks.
+
+---
+
+### Task 15. Resolusi Masalah Suara Hilang & Crash 'VideoPlayerController was used after being disposed' saat Ganti Kualitas
+- [x] Simpan referensi provider notifier di `initState()` pada `player_screen.dart` dan `episode_detail_screen.dart` untuk menghindari error `Bad State: using ref in unmounted widget` di Riverpod saat `dispose()`.
+- [x] Pindahkan `oldController.dispose()` ke dalam `WidgetsBinding.instance.addPostFrameCallback` agar ditunda sampai frame render selesai, mencegah *used after being disposed* crash saat unmounting widget.
+- [x] Bebaskan alokasi `AudioTrack` secara instan dengan memanggil `pause()` dan `setVolume(0.0)` pada old controller sesaat sebelum inisialisasi controller baru.
+- [x] Hilangkan gear selector resolusi manual di UI `CustomVideoPlayer` dan serahkan pemutaran ke ABR (Adaptive Bitrate) HLS ExoPlayer bawaan Android agar pergantian resolusi berjalan otomatis di latar belakang tanpa memicu pergantian controller.
+
+---
+
+### Task 16. Perbaikan Supabase JIT Sync Duplikasi Episode & Pembersihan Episode Sampah (Agent Kim Reactivated)
+- [x] Tambahkan parameter `onConflict` dengan target `'series_id,season_number,episode_number'` pada operasi `.upsert()` episodes Supabase untuk mencegah crash akibat duplikasi key unik saat ID episode dari IDLIX berubah.
+- [x] Implementasikan cleanup step menggunakan query `.not('episode_number', 'in', ...)` untuk menghapus episode usang (sampah) yang ada di database lokal tapi tidak lagi dikembalikan oleh API detail (misal episode 6 s/d 10 pada series *Agent Kim Reactivated*).
+- [x] Integrasikan JIT Sync series episode langsung saat halaman detail Series dibuka (`detail_screen.dart`), bukan hanya saat tombol Play ditekan.
+
+---
+
+### Task 17. Penamaan Aplikasi Asli, Pembersihan Prints, & Full Test Suite (Unit/Widget/Integration Tests)
+- [x] Kembalikan label aplikasi Android di `AndroidManifest.xml` dari `StreamVaultDebug` ke nama asli **StreamVault**.
+- [x] Hapus console print logs tambahan di `cloudflare_bypass.dart` agar log konsol produksi bersih.
+- [x] Tambahkan library `integration_test` ke `dev_dependencies` di `pubspec.yaml` dan jalankan `flutter pub get`.
+- [x] Buat pengujian unit (`test/unit_test.dart`) untuk memverifikasi fungsionalitas parser VTT Subtitle.
+- [x] Buat pengujian widget (`test/widget_test.dart`) untuk memverifikasi UI `ErrorView` dan tombol coba lagi.
+- [x] Buat pengujian integrasi (`integration_test/app_test.dart`) untuk memverifikasi startup aplikasi dan loading awal.
+- [x] Jalankan seluruh test suite dan pastikan semua pengujian lolos (passed).

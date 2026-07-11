@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:streaming_mobile/core/core.dart';
+import 'package:streaming_mobile/core/utils/file_logger.dart';
 import 'package:streaming_mobile/features/detail/data/stream_result.dart';
 import 'package:streaming_mobile/features/detail/domain/detail_provider.dart';
 import 'package:streaming_mobile/shared/atoms/app_text.dart';
@@ -31,49 +32,132 @@ class PlayerScreen extends ConsumerStatefulWidget {
 
 class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   VideoPlayerController? _videoController;
+  VideoPlayerController? _pendingController; // tracks in-flight controller during resolution swap
   List<PlayerSubtitle>? _subtitles;
   SubtitleTrack? _currentSubtitleTrack;
   String _currentResolutionLabel = 'Auto';
+  bool _hasInitialized = false;
+  bool _isDisposed = false;
+  // Store notifier reference before dispose — calling ref.read() in dispose() is unsafe in Riverpod
+  StreamUnlockNotifier? _streamNotifier;
 
   Future<void> _handleResolutionChanged(String url, String label) async {
+    if (_isDisposed) return;
+    FileLogger.log('[PlayerScreen] Starting resolution switch to: $label (URL: $url)');
     final oldController = _videoController;
     final position = oldController?.value.position ?? Duration.zero;
     final isPlaying = oldController?.value.isPlaying ?? false;
 
+    // 1. Instantly set _videoController to null so the UI stops using it and renders the loading spinner
+    if (mounted) {
+      setState(() {
+        _videoController = null;
+      });
+    }
+
+    // 2. Pause and mute the old controller to free the AudioTrack/AudioSession.
+    // We do NOT dispose it yet because the widget tree may still hold references/listeners to it
+    // during the rebuild transition. Disposing it now will cause a crash.
+    if (oldController != null) {
+      try {
+        FileLogger.log('[PlayerScreen] Pausing and muting old controller...');
+        await oldController.pause();
+        await oldController.setVolume(0.0);
+      } catch (e) {
+        FileLogger.log('[PlayerScreen] Failed to pause/mute old controller: $e');
+      }
+    }
+
+    if (_isDisposed) {
+      oldController?.dispose();
+      return;
+    }
+
     final uri = Uri.parse(url);
     final isHls = uri.path.contains('.m3u8') || url.contains('m3u8') || !uri.path.endsWith('.mp4');
 
-    final newController = VideoPlayerController.networkUrl(
+    final headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Referer': 'https://idlixku.com/',
+    };
+
+    VideoPlayerController newController = VideoPlayerController.networkUrl(
       uri,
       formatHint: isHls ? VideoFormat.hls : null,
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
+      httpHeaders: headers,
     );
+
+    _pendingController = newController;
 
     try {
       await newController.initialize();
+      if (_isDisposed) {
+        newController.dispose();
+        _pendingController = null;
+        return;
+      }
+      FileLogger.log('[PlayerScreen] New controller initialized successfully.');
+      await newController.setVolume(1.0);
+      FileLogger.log('[PlayerScreen] New controller volume set to 1.0.');
       await newController.seekTo(position);
+      FileLogger.log('[PlayerScreen] New controller seeked to position: $position');
       if (isPlaying) {
         await newController.play();
+        FileLogger.log('[PlayerScreen] New controller playback started.');
       }
 
-      if (mounted) {
+      if (mounted && !_isDisposed) {
         setState(() {
           _videoController = newController;
           _currentResolutionLabel = label;
         });
+        _pendingController = null;
+      } else {
+        newController.dispose();
+        _pendingController = null;
       }
 
+      // 3. Now that the new controller is active/set, safely dispose the old controller in the next frame.
       if (oldController != null) {
-        await oldController.dispose();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          oldController.dispose().catchError((e) {
+            FileLogger.log('[PlayerScreen] Failed to dispose old controller: $e');
+          });
+        });
       }
     } catch (e) {
-      debugPrint('[PlayerScreen] Quality swap failed: $e');
+      FileLogger.log('[PlayerScreen] Quality swap failed: $e');
       newController.dispose();
+      _pendingController = null;
+
+      // Fail-safe recovery: restore the old controller
+      if (!_isDisposed && oldController != null) {
+        try {
+          await oldController.setVolume(1.0);
+          if (isPlaying) {
+            await oldController.play();
+          }
+        } catch (restoreError) {
+          FileLogger.log('[PlayerScreen] Failed to restore old controller: $restoreError');
+        }
+      }
+
+      if (mounted && !_isDisposed) {
+        setState(() {
+          _videoController = oldController;
+        });
+      } else {
+        oldController?.dispose();
+      }
     }
   }
 
   @override
   void initState() {
     super.initState();
+    // Cache notifier ref here — safe to use in dispose()
+    _streamNotifier = ref.read(streamProviderFor(widget.episodeId).notifier);
     // Lock ke landscape saat player dibuka
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
@@ -86,17 +170,25 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref
           .read(streamProviderFor(widget.episodeId).notifier)
-          .unlock(slug: widget.slug, isMovie: widget.isMovie);
+          .unlock(slug: widget.slug, isMovie: widget.isMovie, context: context);
     });
   }
 
   @override
   void dispose() {
+    _isDisposed = true;
+    // Use pre-stored notifier — safe because it doesn't go through ref
+    try { _streamNotifier?.reset(); } catch (_) {}
     // Kembalikan orientasi normal saat keluar
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     WakelockPlus.disable();
+    // Pause immediately to silence audio before releasing resources
+    _videoController?.pause();
     _videoController?.dispose();
+    // Also dispose any in-flight pending controller from a resolution swap
+    _pendingController?.pause();
+    _pendingController?.dispose();
     super.dispose();
   }
 
@@ -120,9 +212,16 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
         url.contains('m3u8') ||
         !uri.path.endsWith('.mp4');
 
+    final headers = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'Referer': 'https://idlixku.com/',
+    };
+
     _videoController = VideoPlayerController.networkUrl(
       uri,
       formatHint: isHls ? VideoFormat.hls : null,
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      httpHeaders: headers,
     );
     await _videoController!.initialize();
 
@@ -143,6 +242,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
       setState(() {
         _subtitles = parsedSubtitles;
         _currentSubtitleTrack = selectedTrack;
+        _hasInitialized = true;
       });
     }
   }
@@ -152,7 +252,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
     final streamState = ref.watch(streamProviderFor(widget.episodeId));
 
     ref.listen(streamProviderFor(widget.episodeId), (prev, next) {
-      if (next.hasResult && _videoController == null) {
+      if (next.hasResult && !_hasInitialized) {
         _initPlayer(next.result!.url, subtitleTracks: next.result!.subtitles);
       }
     });
@@ -203,6 +303,14 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen> {
             _CountdownOverlay(
               streamState: streamState,
               onBack: () => context.pop(),
+            ),
+
+          // ── Loading Spinner for Resolution Switching ──
+          if (streamState.hasResult && (_videoController == null || !_videoController!.value.isInitialized))
+            const Center(
+              child: CircularProgressIndicator(
+                color: Colors.red,
+              ),
             ),
         ],
       ),

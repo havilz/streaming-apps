@@ -90,6 +90,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(homeProvider.notifier).reload();
+      ClientSyncService.syncGlobal().then((_) {
+        if (mounted) {
+          ref.read(homeProvider.notifier).reload();
+        }
+      });
     });
     _scrollController.addListener(_onScroll);
   }
@@ -621,7 +626,7 @@ class _ErrorView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
