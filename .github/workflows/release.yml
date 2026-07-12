@@ -22,11 +22,13 @@ jobs:
         id: next_tag
         run: |
           git fetch --tags
-          latest_tag=$(git tag --sort=-v:refname | grep -E '^v1\.0\.0\.[0-9]+$' | head -n 1)
+          latest_tag=$(git tag --sort=-v:refname | grep -E '^v?1\.0\.0\.[0-9]+$' | head -n 1)
           if [ -z "$latest_tag" ]; then
-            next_tag="v1.0.0.1"
+            next_tag="v1.0.0.3" # Default jika tidak ada sama sekali, tapi kita tahu ada 1.0.0.2
           else
-            last_num=$(echo "$latest_tag" | awk -F. '{print $4}')
+            # Bersihkan huruf 'v' jika ada untuk mengambil angka terakhir secara konsisten
+            clean_tag=$(echo "$latest_tag" | sed 's/^v//')
+            last_num=$(echo "$clean_tag" | awk -F. '{print $4}')
             next_num=$((last_num + 1))
             next_tag="v1.0.0.$next_num"
           fi
@@ -63,7 +65,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.next_tag.outputs.tag }}
-          name: Release ${{ steps.next_tag.outputs.tag }}
+          name: StreamVault ${{ steps.next_tag.outputs.tag }}
           files: streaming_mobile/build/app/outputs/flutter-apk/StreamVault-${{ steps.next_tag.outputs.tag }}.apk
           draft: false
           prerelease: false
