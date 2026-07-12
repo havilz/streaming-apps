@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'streaming_mobile/**'
+      - '.github/workflows/release.yml'
 
 jobs:
   build-and-release:
