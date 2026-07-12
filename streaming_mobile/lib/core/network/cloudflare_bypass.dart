@@ -19,12 +19,22 @@ class CloudflareBypassService {
 
   bool get hasValidCookies {
     if (_lastHarvested == null) return false;
-    // cf_clearance is the real Cloudflare bypass cookie.
-    // Without it, even if we have other cookies, the API will return 403.
-    if (_cookieString == null || !_cookieString!.contains('cf_clearance')) return false;
-    // Clearance cookies usually last from 1 to 24 hours.
-    // We renew them every 2 hours to stay fresh.
+    if (_cookieString == null || _cookieString!.isEmpty) return false;
+    // Clearance cookies/sessions are valid for 2 hours in memory.
     return DateTime.now().difference(_lastHarvested!) < const Duration(hours: 2);
+  }
+
+  void reset() {
+    _cookieString = null;
+    _userAgent = null;
+    _lastHarvested = null;
+    print('[CloudflareBypassService] Cleared harvested cookies and UA.');
+  }
+
+  bool _isChallengeUrl(String url) {
+    return url.contains('challenges.cloudflare.com') ||
+        url.contains('/cdn-cgi/challenge') ||
+        url.contains('/cdn-cgi/l/chk');
   }
 
   Future<void> ensureBypass(String targetUrl, {BuildContext? context}) async {
@@ -89,24 +99,31 @@ class CloudflareBypassService {
           print('[CloudflareBypassService] Headless load started: $url');
         },
         onLoadStop: (controller, url) async {
-          print('[CloudflareBypassService] Headless page loaded: $url');
-          // Brief wait for JS cookies to settle (2s is enough to detect if cf_clearance appears)
-          await Future.delayed(const Duration(seconds: 2));
-          await _saveCookiesAndUA(controller, url!.toString(), targetUrl);
+          final currentUrl = url?.toString() ?? '';
+          print('[CloudflareBypassService] Headless page loaded: $currentUrl');
+          
+          await _saveCookiesAndUA(controller, currentUrl, targetUrl);
+          
+          if (!_isChallengeUrl(currentUrl)) {
+            _lastHarvested = DateTime.now();
+            print('[CloudflareBypassService] Headless loaded target page without challenge. Bypass marked as successful.');
+          } else {
+            print('[CloudflareBypassService] Headless detected Cloudflare challenge page. Waiting for cf_clearance cookie...');
+          }
         },
       );
 
       await headlessWebView.run();
 
-      // Poll up to 6 seconds. If cf_clearance does not appear, Turnstile is blocking us headlessly.
+      // Poll up to 6 seconds. Ifcf_clearance is not found on challenge page, return false.
       int maxPolls = 6;
-      while (maxPolls > 0 && !hasValidCookies) {
+      while (maxPolls > 0 && _lastHarvested == null) {
         await Future.delayed(const Duration(seconds: 1));
         maxPolls--;
       }
 
       await headlessWebView.dispose();
-      return hasValidCookies;
+      return _lastHarvested != null;
     } catch (e) {
       print('[CloudflareBypassService] Headless bypass exception: $e');
       return false;
@@ -189,13 +206,13 @@ class CloudflareBypassService {
                         },
                         onLoadStop: (controller, url) async {
                           if (completer.isCompleted) return;
-                          print('[CloudflareBypassService] Visible page loaded: $url');
-                          await Future.delayed(const Duration(seconds: 3));
+                          final currentUrl = url?.toString() ?? '';
+                          print('[CloudflareBypassService] Visible page loaded: $currentUrl');
+                          await Future.delayed(const Duration(seconds: 2));
                           if (completer.isCompleted) return;
-                          await _saveCookiesAndUA(controller, url!.toString(), targetUrl);
-                          if (hasValidCookies && !completer.isCompleted) {
-                            print('[CloudflareBypassService] cf_clearance detected on loadStop!');
-                            // Use dialogContext directly — we're still inside the builder's scope
+                          await _saveCookiesAndUA(controller, currentUrl, targetUrl);
+                          if (_lastHarvested != null && !completer.isCompleted) {
+                            print('[CloudflareBypassService] Target page harvested successfully on loadStop!');
                             if (dialogContext.mounted) Navigator.of(dialogContext).pop();
                             completer.complete(true);
                           }
@@ -220,10 +237,11 @@ class CloudflareBypassService {
       await Future.delayed(const Duration(seconds: 2));
       if (completer.isCompleted) return false;
       if (dialogController != null) {
-        await _saveCookiesAndUA(dialogController!, targetUrl, targetUrl);
+        final currentUrl = (await dialogController!.getUrl())?.toString() ?? targetUrl;
+        await _saveCookiesAndUA(dialogController!, currentUrl, targetUrl);
       }
-      if (hasValidCookies && !completer.isCompleted) {
-        print('[CloudflareBypassService] Polling: cf_clearance found! Dismissing dialog.');
+      if (_lastHarvested != null && !completer.isCompleted) {
+        print('[CloudflareBypassService] Polling: Valid session found! Dismissing dialog.');
         // Capture navigator before async gap to satisfy use_build_context_synchronously
         final nav = context.mounted ? Navigator.maybeOf(context) : null;
         nav?.pop();
@@ -256,13 +274,16 @@ class CloudflareBypassService {
         _userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
       }
 
-      // Only mark as successfully harvested if cf_clearance is present.
-      // Without cf_clearance, the cookies are not sufficient to bypass Cloudflare.
-      if (cookieMap.containsKey('cf_clearance')) {
+      // If it is a normal page load (not a challenge URL), mark as successful.
+      // If it is a Cloudflare challenge page, only mark as successful if cf_clearance is present.
+      if (!_isChallengeUrl(url)) {
+        _lastHarvested = DateTime.now();
+        print('[CloudflareBypassService] Harvested cookies and userAgent successfully for normal page!');
+      } else if (cookieMap.containsKey('cf_clearance')) {
         _lastHarvested = DateTime.now();
         print('[CloudflareBypassService] Harvested cookies and userAgent successfully! cf_clearance found.');
       } else {
-        print('[CloudflareBypassService] WARNING: cf_clearance not found in cookies. Bypass not complete. Cookies: $cookieMap');
+        print('[CloudflareBypassService] WARNING: cf_clearance not found in cookies during challenge page load. Cookies: $cookieMap');
       }
     } catch (e) {
       print('[CloudflareBypassService] Error extracting cookies/UA: $e');

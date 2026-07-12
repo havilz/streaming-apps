@@ -638,4 +638,27 @@ Mengimplementasikan fitur **Pull to Sync** langsung di semua halaman rincian kon
 **Hasil Akhir:**
 - Pengguna dapat melakukan tarik ke bawah (*pull-to-refresh*) secara visual di halaman Detail Film, Detail Serial, dan Detail Episode untuk langsung melakukan force-sync katalog konten segar.
 - Transisi rendering spinner indicator berjalan mulus.
-- Hasil integrasi lolos uji analisis statis (`flutter analyze`) dan uji coba test suite.
+- Hasil integrasi lolos uji analisis statis (`flutter analyze`) dan uji coba test suite.
+
+---
+
+## Checkpoint 41 - Optimasi Headless Cloudflare Bypass (Deteksi Tanpa Challenge) & Label SVdebug
+
+**Problem:**
+1. Sebelumnya, validasi cookie di `CloudflareBypassService` sangat ketat dan selalu mewajibkan kehadiran cookie `cf_clearance`.
+2. Saat Cloudflare di situs IDLIX sedang mati atau tidak aktif memicu challenge (kondisi normal aman), pemuatan headless webview sukses membuka situs, namun cookie `cf_clearance` tidak pernah dibuat karena tidak ada Turnstile. Hal ini dideteksi sebagai kegagalan bypass oleh sistem, memicu dialog visible bottom sheet yang tidak perlu di UI. Pengguna terpaksa harus mengklik tombol close (**X**) manual setiap kali memutar video.
+
+**Solution:**
+1. **Deteksi Cerdas URL Challenge:** Menambahkan helper method `_isChallengeUrl` untuk membedakan apakah webview sedang berada di halaman tantangan Cloudflare (seperti `challenges.cloudflare.com` / `/cdn-cgi/challenge`) atau di halaman utama situs normal.
+2. **Kelonggaran Validitas Fresh Cookie:** Memodifikasi `hasValidCookies` agar menganggap bypass sukses jika session cookie normal sudah terisi dan berumur di bawah 2-jam, tanpa mewajibkan cookie `cf_clearance` kecuali jika sistem mendeteksi webview sedang dialihkan ke halaman challenge.
+3. **Instan Headless Bypass:** Memperbarui `_tryHeadlessBypass` dan `_saveCookiesAndUA` agar langsung menandai bypass selesai secara asinkron di latar belakang jika situs berhasil dimuat tanpa challenge. Ini memotong overhead dialog bottom sheet sehingga video langsung berputar instan (tanpa kedipan popup bottom sheet).
+4. **Auto-Dismiss & Fallback Tetap Aman:** Jika Cloudflare di masa mendatang mendeteksi anomali dan menyajikan Turnstile Challenge interaktif, sistem tetap secara aman memunculkan dialog visible bottom sheet agar pengguna dapat mencentang verifikasi secara manual. Begitu centang Turnstile selesai, dialog otomatis pop dan menutup sendiri secara instan.
+5. **App Name Change:** Mengganti parameter `android:label` di `AndroidManifest.xml` menjadi **SVdebug**.
+
+**Status:** Selesai
+
+**Hasil Akhir:**
+- Ketika Cloudflare sedang tidak aktif memicu challenge, video terputar secara instan dalam 1-2 detik tanpa pernah menampilkan dialog bottom sheet.
+- Ketika Cloudflare aktif menuntut Turnstile, dialog visual fallback tetap muncul dan menutup otomatis secara aman begitu verifikasi manual selesai dicentang.
+- Label aplikasi diubah menjadi **SVdebug**.
+- Seluruh rangkaian pengujian statis (`flutter analyze`) dan test suite lolos 100% (Passed).
