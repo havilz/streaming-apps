@@ -50,8 +50,8 @@ class ClientSyncService {
   }
 
   /// Level 1: Global Background Sync (Home Screen)
-  static Future<void> syncGlobal() async {
-    if (!await shouldSyncGlobal()) {
+  static Future<void> syncGlobal({bool force = false}) async {
+    if (!force && !await shouldSyncGlobal()) {
       print('[ClientSyncService] Global sync skipped due to 30-minute cooldown.');
       return;
     }
@@ -122,8 +122,8 @@ class ClientSyncService {
   }
 
   /// Level 2: Just-In-Time (JIT) Targeted Sync (Series Detail Screen)
-  static Future<void> syncSeriesEpisodes(String seriesId, String seriesSlug) async {
-    if (!await shouldSyncSeries(seriesId)) {
+  static Future<void> syncSeriesEpisodes(String seriesId, String seriesSlug, {bool force = false}) async {
+    if (!force && !await shouldSyncSeries(seriesId)) {
       print('[ClientSyncService] Series $seriesSlug sync skipped due to 5-minute cooldown.');
       return;
     }

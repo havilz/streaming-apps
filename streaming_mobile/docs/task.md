@@ -282,3 +282,14 @@ Daftar ini digunakan untuk memantau progress pengerjaan aplikasi mobile. Setiap 
 - [x] Buat pengujian widget (`test/widget_test.dart`) untuk memverifikasi UI `ErrorView` dan tombol coba lagi.
 - [x] Buat pengujian integrasi (`integration_test/app_test.dart`) untuk memverifikasi startup aplikasi dan loading awal.
 - [x] Jalankan seluruh test suite dan pastikan semua pengujian lolos (passed).
+
+---
+
+### Task 18. Implementasi Pull to Sync pada Halaman Detail Konten (Series/Movie/Episode)
+- [x] Modifikasi `ClientSyncService` (atau helper pendukung) agar mendukung bypass cooldown (force sync) saat pull-to-refresh manual dipicu oleh pengguna.
+- [x] Bungkus layout `CustomScrollView` di `DetailScreen` (`_SeriesBody` dan `_MovieBody`) dengan widget `RefreshIndicator`.
+- [x] Implementasikan callback `onRefresh` pada detail Series untuk memicu paksa JIT sync serial/episode dan merefresh UI (invalidate provider).
+- [x] Implementasikan callback `onRefresh` pada detail Movie untuk memicu penyegaran detail film.
+- [x] Bungkus layout `CustomScrollView` di `EpisodeDetailScreen` dengan widget `RefreshIndicator` untuk menyegarkan detail episode aktif.
+- [x] Jalankan static analysis dan verifikasi fungsionalitas visual pull-to-refresh di emulator/HP.
+

@@ -614,3 +614,28 @@ Mengimplementasikan **Hybrid Cloudflare Bypass System**:
 - Sinkronisasi catalog series dan episode berjalan 100% akurat.
 - Nama aplikasi peluncur kembali normal ke **StreamVault**.
 - Seluruh rangkaian test suite (Unit, Widget, Integration) berhasil dibuat dan lolos 100% (Passed).
+
+---
+
+## Checkpoint 40 - Implementasi Pull to Sync pada Halaman Detail Konten (Series/Movie/Episode)
+
+**Problem:**
+Sebelumnya, jika sebuah serial TV memiliki pembaruan episode baru di server IDLIX namun belum ter-sync ke database lokal, pengguna harus kembali ke halaman beranda (Home) dan melakukan tarikan layar kebawah (pull-to-refresh) global untuk memicu sinkronisasi ulang. Membuka halaman detail langsung tanpa kembali ke beranda tidak memberikan cara manual bagi pengguna untuk memaksa sinkronisasi katalog episode baru, sehingga sangat membatasi pengalaman pengguna (UX).
+
+**Solution:**
+Mengimplementasikan fitur **Pull to Sync** langsung di semua halaman rincian konten:
+1. **Bypass Cooldown Mode:** Menambahkan dukungan parameter `force: true` pada `ClientSyncService.syncSeriesEpisodes` dan `syncGlobal`. Ketika `force` diset true, pemeriksaan durasi cooldown (5 menit untuk serial, 30 menit untuk beranda) dilewati sehingga web crawling lokal langsung dieksekusi secara instan.
+2. **Integrasi RefreshIndicator di Rincian Serial & Film:** 
+   - Membungkus `CustomScrollView` pada halaman rincian Serial dan Film dengan widget `RefreshIndicator`.
+   - Mengubah `_MovieBody` dari `StatelessWidget` menjadi `ConsumerStatefulWidget` agar dapat menggunakan widget `RefreshIndicator` dan Riverpod `ref` secara interaktif.
+   - Mengonfigurasi properti scroll physics ke `AlwaysScrollableScrollPhysics` agar tarikan refresh tetap dapat dilakukan meskipun konten belum meluap melebihi tinggi layar.
+3. **Integrasi RefreshIndicator di Rincian Episode:**
+   - Membungkus `CustomScrollView` pada `EpisodeDetailScreen` dengan widget `RefreshIndicator`.
+   - Menghubungkan tarikan refresh episode aktif untuk memicu update pada series terasosiasi dan menyegarkan episodes provider secara otomatis.
+
+**Status:** Selesai
+
+**Hasil Akhir:**
+- Pengguna dapat melakukan tarik ke bawah (*pull-to-refresh*) secara visual di halaman Detail Film, Detail Serial, dan Detail Episode untuk langsung melakukan force-sync katalog konten segar.
+- Transisi rendering spinner indicator berjalan mulus.
+- Hasil integrasi lolos uji analisis statis (`flutter analyze`) dan uji coba test suite.

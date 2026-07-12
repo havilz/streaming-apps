@@ -234,129 +234,143 @@ class _EpisodeDetailBody extends ConsumerWidget {
 
         final imageToShow = episode.stillUrl ?? series.backdropUrl;
 
-        return CustomScrollView(
-          slivers: [
-            _BackdropAppBar(
-              stillUrl: imageToShow,
-              episodeNumber: episode.episodeNumber,
-              seasonNumber: episode.seasonNumber,
-              episodeId: episode.id,
-              slug: slug,
-              isPlaying: isPlaying,
-              onPlay: onPlayPressed,
-            ),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: AppSpacing.sm),
-                    // Judul Episode
-                    AppText(
-                      episode.title ?? 'Episode ${episode.episodeNumber}',
-                      variant: AppTextVariant.heading,
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    // Meta info
-                    _MetaRow(
-                      seasonNumber: episode.seasonNumber,
-                      episodeNumber: episode.episodeNumber,
-                      airDate: episode.airDate,
-                      runtime: episode.runtime,
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    // Sinopsis
-                    const AppText('Sinopsis Episode', variant: AppTextVariant.title),
-                    const SizedBox(height: AppSpacing.xs),
-                    AppText(
-                      (episode.overview != null && episode.overview!.isNotEmpty)
-                          ? episode.overview!
-                          : 'Tidak ada sinopsis untuk episode ini.',
-                      variant: AppTextVariant.body,
-                      color: AppColors.textMuted,
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
-                  ],
-                ),
+        return RefreshIndicator(
+          onRefresh: () async {
+            try {
+              await ClientSyncService.syncSeriesEpisodes(
+                series.id,
+                series.slug,
+                force: true,
+              );
+              ref.invalidate(episodeDetailProvider(activeEpisodeId));
+              ref.invalidate(episodesProvider((seriesId: series.id, season: activeSeason)));
+            } catch (_) {}
+          },
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              _BackdropAppBar(
+                stillUrl: imageToShow,
+                episodeNumber: episode.episodeNumber,
+                seasonNumber: episode.seasonNumber,
+                episodeId: episode.id,
+                slug: slug,
+                isPlaying: isPlaying,
+                onPlay: onPlayPressed,
               ),
-            ),
-
-            // Season selector
-            if ((series.numberOfSeasons ?? 0) > 1)
               SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.only(
-                        left: AppSpacing.md,
-                        bottom: AppSpacing.sm,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: AppSpacing.sm),
+                      // Judul Episode
+                      AppText(
+                        episode.title ?? 'Episode ${episode.episodeNumber}',
+                        variant: AppTextVariant.heading,
                       ),
-                      child: AppText('Season', variant: AppTextVariant.title),
-                    ),
-                    SeasonSelector(
-                      seasonCount: series.numberOfSeasons!,
-                      activeSeason: activeSeason,
-                      onSeasonSelected: (s) =>
-                          ref.read(activeSeasonProviderFor(slug).notifier).set(s),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                  ],
-                ),
-              ),
-
-            // Label episode
-            const SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: AppSpacing.md,
-                  bottom: AppSpacing.sm,
-                ),
-                child: AppText('Episode Lainnya', variant: AppTextVariant.title),
-              ),
-            ),
-
-            // Daftar episode
-            episodesAsync.when(
-              loading: () => const SliverToBoxAdapter(
-                child: Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(AppSpacing.lg),
-                    child: CircularProgressIndicator(color: AppColors.primary),
+                      const SizedBox(height: AppSpacing.xs),
+                      // Meta info
+                      _MetaRow(
+                        seasonNumber: episode.seasonNumber,
+                        episodeNumber: episode.episodeNumber,
+                        airDate: episode.airDate,
+                        runtime: episode.runtime,
+                      ),
+                      const SizedBox(height: AppSpacing.lg),
+                      // Sinopsis
+                      const AppText('Sinopsis Episode', variant: AppTextVariant.title),
+                      const SizedBox(height: AppSpacing.xs),
+                      AppText(
+                        (episode.overview != null && episode.overview!.isNotEmpty)
+                            ? episode.overview!
+                            : 'Tidak ada sinopsis untuk episode ini.',
+                        variant: AppTextVariant.body,
+                        color: AppColors.textMuted,
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                    ],
                   ),
                 ),
               ),
-              error: (e, _) => SliverToBoxAdapter(
-                child: Center(
-                  child: AppText(e.toString(), color: AppColors.textMuted),
+  
+              // Season selector
+              if ((series.numberOfSeasons ?? 0) > 1)
+                SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.only(
+                          left: AppSpacing.md,
+                          bottom: AppSpacing.sm,
+                        ),
+                        child: AppText('Season', variant: AppTextVariant.title),
+                      ),
+                      SeasonSelector(
+                        seasonCount: series.numberOfSeasons!,
+                        activeSeason: activeSeason,
+                        onSeasonSelected: (s) =>
+                            ref.read(activeSeasonProviderFor(slug).notifier).set(s),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                    ],
+                  ),
+                ),
+  
+              // Label episode
+              const SliverToBoxAdapter(
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    left: AppSpacing.md,
+                    bottom: AppSpacing.sm,
+                  ),
+                  child: AppText('Episode Lainnya', variant: AppTextVariant.title),
                 ),
               ),
-              data: (epList) => SliverList(
-                delegate: SliverChildBuilderDelegate((context, index) {
-                  final ep = epList[index];
-                  final isCurrentActive = ep.id == activeEpisodeId;
-
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.md,
-                      vertical: AppSpacing.xs,
+  
+              // Daftar episode
+              episodesAsync.when(
+                loading: () => const SliverToBoxAdapter(
+                  child: Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(AppSpacing.lg),
+                      child: CircularProgressIndicator(color: AppColors.primary),
                     ),
-                    child: EpisodeTile(
-                      episodeNumber: ep.episodeNumber,
-                      title: ep.title ?? 'Episode ${ep.episodeNumber}',
-                      stillUrl: ep.stillUrl,
-                      airDate: ep.airDate,
-                      isActive: isCurrentActive,
-                      onTap: () => onEpisodeSelect(ep.id, ep),
-                    ),
-                  );
-                }, childCount: epList.length),
+                  ),
+                ),
+                error: (e, _) => SliverToBoxAdapter(
+                  child: Center(
+                    child: AppText(e.toString(), color: AppColors.textMuted),
+                  ),
+                ),
+                data: (epList) => SliverList(
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    final ep = epList[index];
+                    final isCurrentActive = ep.id == activeEpisodeId;
+  
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.md,
+                        vertical: AppSpacing.xs,
+                      ),
+                      child: EpisodeTile(
+                        episodeNumber: ep.episodeNumber,
+                        title: ep.title ?? 'Episode ${ep.episodeNumber}',
+                        stillUrl: ep.stillUrl,
+                        airDate: ep.airDate,
+                        isActive: isCurrentActive,
+                        onTap: () => onEpisodeSelect(ep.id, ep),
+                      ),
+                    );
+                  }, childCount: epList.length),
+                ),
               ),
-            ),
-
-            const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
-          ],
+  
+              const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
+            ],
+          ),
         );
       },
     );

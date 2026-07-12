@@ -65,64 +65,75 @@ class DetailScreen extends ConsumerWidget {
 
 // ── Movie Body ────────────────────────────────────────────────
 
-class _MovieBody extends StatefulWidget {
+class _MovieBody extends ConsumerStatefulWidget {
   const _MovieBody({required this.movie, required this.slug});
   final MovieModel movie;
   final String slug;
 
   @override
-  State<_MovieBody> createState() => _MovieBodyState();
+  ConsumerState<_MovieBody> createState() => _MovieBodyState();
 }
 
-class _MovieBodyState extends State<_MovieBody> {
+class _MovieBodyState extends ConsumerState<_MovieBody> {
   bool _isPlaying = false;
 
   @override
   Widget build(BuildContext context) {
-    return CustomScrollView(
-      slivers: [
-        _BackdropAppBar(
-          backdropUrl: widget.movie.backdropUrl,
-          isPlaying: _isPlaying,
-          movieId: widget.movie.id,
-          slug: widget.slug,
-          onPlay: () => setState(() => _isPlaying = true),
-        ),
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                AppText(widget.movie.title, variant: AppTextVariant.heading),
-                const SizedBox(height: AppSpacing.xs),
-                _MetaRow(
-                  year: widget.movie.year,
-                  runtime: widget.movie.runtime,
-                  voteAverage: widget.movie.voteAverage,
-                  quality: widget.movie.quality,
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                if (widget.movie.genres.isNotEmpty)
-                  _GenreBadges(genres: widget.movie.genres),
-                const SizedBox(height: AppSpacing.md),
-                if (widget.movie.overview != null &&
-                    widget.movie.overview!.isNotEmpty) ...[
-                  const AppText('Sinopsis', variant: AppTextVariant.title),
+    return RefreshIndicator(
+      onRefresh: () async {
+        try {
+          await ClientSyncService.syncGlobal(force: true);
+          if (mounted) {
+            ref.invalidate(movieDetailProvider(widget.slug));
+          }
+        } catch (_) {}
+      },
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          _BackdropAppBar(
+            backdropUrl: widget.movie.backdropUrl,
+            isPlaying: _isPlaying,
+            movieId: widget.movie.id,
+            slug: widget.slug,
+            onPlay: () => setState(() => _isPlaying = true),
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  AppText(widget.movie.title, variant: AppTextVariant.heading),
                   const SizedBox(height: AppSpacing.xs),
-                  AppText(
-                    widget.movie.overview!,
-                    variant: AppTextVariant.body,
-                    color: AppColors.textMuted,
+                  _MetaRow(
+                    year: widget.movie.year,
+                    runtime: widget.movie.runtime,
+                    voteAverage: widget.movie.voteAverage,
+                    quality: widget.movie.quality,
                   ),
+                  const SizedBox(height: AppSpacing.sm),
+                  if (widget.movie.genres.isNotEmpty)
+                    _GenreBadges(genres: widget.movie.genres),
                   const SizedBox(height: AppSpacing.md),
+                  if (widget.movie.overview != null &&
+                      widget.movie.overview!.isNotEmpty) ...[
+                    const AppText('Sinopsis', variant: AppTextVariant.title),
+                    const SizedBox(height: AppSpacing.xs),
+                    AppText(
+                      widget.movie.overview!,
+                      variant: AppTextVariant.body,
+                      color: AppColors.textMuted,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
                 ],
-              ],
+              ),
             ),
           ),
-        ),
-        const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
-      ],
+          const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
+        ],
+      ),
     );
   }
 }
@@ -182,8 +193,23 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
       episodesProvider((seriesId: widget.series.id, season: activeSeason)),
     );
 
-    return CustomScrollView(
-      slivers: [
+    return RefreshIndicator(
+      onRefresh: () async {
+        try {
+          await ClientSyncService.syncSeriesEpisodes(
+            widget.series.id,
+            widget.series.slug,
+            force: true,
+          );
+          if (mounted) {
+            ref.invalidate(episodesProvider((seriesId: widget.series.id, season: activeSeason)));
+            ref.invalidate(seriesDetailProvider(widget.slug));
+          }
+        } catch (_) {}
+      },
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
         _BackdropAppBar(backdropUrl: widget.series.backdropUrl),
         SliverToBoxAdapter(
           child: Padding(
@@ -296,8 +322,9 @@ class _SeriesBodyState extends ConsumerState<_SeriesBody> {
 
         const SliverToBoxAdapter(child: SizedBox(height: AppSpacing.xl)),
       ],
-    );
-  }
+    ),
+  );
+}
 }
 
 // ── Shared widgets ────────────────────────────────────────────
