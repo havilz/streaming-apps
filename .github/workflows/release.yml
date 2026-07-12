@@ -30,7 +30,7 @@ jobs:
             next_num=$((last_num + 1))
             next_tag="v1.0.0.$next_num"
           fi
-          echo "NEXT_TAG=$next_tag" >> $GITHUB_ENV
+          echo "tag=$next_tag" >> $GITHUB_OUTPUT
           echo "Calculated next tag: $next_tag"
 
       - name: Set up Java 17
@@ -57,14 +57,14 @@ jobs:
 
       - name: Prepare Release Asset
         run: |
-          cp streaming_mobile/build/app/outputs/flutter-apk/app-release.apk streaming_mobile/build/app/outputs/flutter-apk/StreamVault.apk
+          cp streaming_mobile/build/app/outputs/flutter-apk/app-release.apk streaming_mobile/build/app/outputs/flutter-apk/StreamVault-${{ steps.next_tag.outputs.tag }}.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ env.NEXT_TAG }}
-          name: Release ${{ env.NEXT_TAG }}
-          files: streaming_mobile/build/app/outputs/flutter-apk/StreamVault.apk
+          tag_name: ${{ steps.next_tag.outputs.tag }}
+          name: Release ${{ steps.next_tag.outputs.tag }}
+          files: streaming_mobile/build/app/outputs/flutter-apk/StreamVault-${{ steps.next_tag.outputs.tag }}.apk
           draft: false
           prerelease: false
         env:
