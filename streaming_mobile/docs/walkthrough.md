@@ -653,7 +653,6 @@ Mengimplementasikan fitur **Pull to Sync** langsung di semua halaman rincian kon
 2. **Kelonggaran Validitas Fresh Cookie:** Memodifikasi `hasValidCookies` agar menganggap bypass sukses jika session cookie normal sudah terisi dan berumur di bawah 2-jam, tanpa mewajibkan cookie `cf_clearance` kecuali jika sistem mendeteksi webview sedang dialihkan ke halaman challenge.
 3. **Instan Headless Bypass:** Memperbarui `_tryHeadlessBypass` dan `_saveCookiesAndUA` agar langsung menandai bypass selesai secara asinkron di latar belakang jika situs berhasil dimuat tanpa challenge. Ini memotong overhead dialog bottom sheet sehingga video langsung berputar instan (tanpa kedipan popup bottom sheet).
 4. **Auto-Dismiss & Fallback Tetap Aman:** Jika Cloudflare di masa mendatang mendeteksi anomali dan menyajikan Turnstile Challenge interaktif, sistem tetap secara aman memunculkan dialog visible bottom sheet agar pengguna dapat mencentang verifikasi secara manual. Begitu centang Turnstile selesai, dialog otomatis pop dan menutup sendiri secara instan.
-5. **App Name Change:** Mengganti parameter `android:label` di `AndroidManifest.xml` menjadi **SVdebug**.
 
 **Status:** Selesai
 
