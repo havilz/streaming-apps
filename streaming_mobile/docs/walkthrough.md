@@ -661,3 +661,27 @@ Mengimplementasikan fitur **Pull to Sync** langsung di semua halaman rincian kon
 - Ketika Cloudflare aktif menuntut Turnstile, dialog visual fallback tetap muncul dan menutup otomatis secara aman begitu verifikasi manual selesai dicentang.
 - Label aplikasi diubah menjadi **SVdebug**.
 - Seluruh rangkaian pengujian statis (`flutter analyze`) dan test suite lolos 100% (Passed).
+
+---
+
+## Checkpoint 42 - Otomatisasi Rilis CI/CD via GitHub Actions
+
+**Problem:**
+Proses rilis aplikasi sebelumnya mengharuskan developer melakukan build APK rilis secara manual di komputer lokal (`flutter build apk --release`), mengganti nama berkas secara manual ke `StreamVault.apk`, lalu mengunggahnya ke GitHub Release. Ini tidak efisien, berisiko melupakan berkas `.env` dengan kredensial produksi yang tepat, dan mengharuskan developer melacak serta mengetik nomor tag rilis Git secara manual.
+
+**Solution:**
+Mengimplementasikan alur **Otomatisasi CI/CD via GitHub Actions** dengan membuat berkas konfigurasi `.github/workflows/release.yml`:
+1. **Trigger on Main Push/Merge:** Alur CI/CD otomatis terpicu begitu ada push/merge dari branch pengembangan (`dev`) ke branch utama (`main`).
+2. **Kalkulasi Tag Dinamis Otomatis (Auto-Bumping):** Menggunakan script shell bash untuk mengambil seluruh daftar tag Git yang ada di repositori, memilah tag dengan pola format `v1.0.0.X` (seperti `v1.0.0.1`, `v1.0.0.2`), menginkremen angka sub-versi `X` sebesar 1 (contoh: menjadi `v1.0.0.3`), dan mengekspornya ke environment pipeline sebagai tag rilis berikutnya secara dinamis.
+3. **Injeksi Kredensial Produksi Aman:** Membaca data `SUPABASE_URL` dan `SUPABASE_ANON_KEY` dari **GitHub Repository Secrets** dan menyuntikkannya ke file `streaming_mobile/.env` secara aman saat runtime pipeline dijalankan. Hal ini mencegah tereksposnya API Key Supabase ke dalam riwayat Git publik.
+4. **Setup, Build & Publish Asset:**
+   - Menyiapkan lingkungan build Android SDK menggunakan Java 17 dan Flutter SDK (`subosito/flutter-action@v2`).
+   - Melakukan kompilasi aplikasi dengan `flutter build apk --release`.
+   - Menyalin berkas keluaran APK rilis ke nama seragam `StreamVault.apk`.
+   - Membuat rilis publik baru di GitHub menggunakan `softprops/action-gh-release@v1` dan mengunggah berkas APK secara otomatis.
+
+**Status:** Selesai
+
+**Hasil Akhir:**
+- Alur kerja CI/CD siap dijalankan secara aman dan otomatis di GitHub begitu branch `dev` di-merge ke branch `main`.
+- Rilis GitHub akan otomatis dibuat dengan tag berurutan `v1.0.0.X` secara berkala beserta lampiran APK produksinya.

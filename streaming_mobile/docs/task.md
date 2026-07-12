@@ -495,3 +495,13 @@ Daftar ini digunakan untuk memantau progress pengerjaan aplikasi mobile. Setiap 
 - [x] Verifikasi bahwa dialog visual bottom sheet sama sekali tidak muncul (instan play) ketika Cloudflare sedang dalam kondisi mati/tanpa challenge.
 - [x] Uji skenario jika Cloudflare sedang aktif memberikan challenge: pastikan fallback dialog visual bottom sheet tetap muncul secara aman dan menutup otomatis setelah Turnstile sukses dicentang.
 - [x] Jalankan static analysis dan verifikasi build.
+
+---
+
+### Task 20. Otomatisasi Rilis CI/CD via GitHub Actions
+- [x] Buat struktur folder konfigurasi `.github/workflows/`.
+- [x] Buat berkas alur kerja `.github/workflows/release.yml` untuk memicu build otomatis pada saat commit/merge di branch `main`.
+- [x] Integrasikan mekanisme dynamic tag auto-bumping dengan format `v1.0.0.X` menggunakan bash script.
+- [x] Konfigurasi environment variables Supabase URL dan Anon Key untuk diinjeksi ke berkas `.env` dari GitHub Secrets pada saat build.
+- [x] Tambahkan langkah kompilasi APK rilis, penyalinan nama ke `StreamVault.apk`, dan pemostingan rilis baru menggunakan `softprops/action-gh-release`.
+- [x] Pastikan static analysis bersih di lokal.

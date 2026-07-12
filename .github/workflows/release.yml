@@ -1,0 +1,71 @@
+name: Build & Release StreamVault APK
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-release:
+    name: Build and Release APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0 # Wajib agar semua tag historis terunduh untuk kalkulasi versi baru
+
+      - name: Get Next Tag
+        id: next_tag
+        run: |
+          git fetch --tags
+          latest_tag=$(git tag --sort=-v:refname | grep -E '^v1\.0\.0\.[0-9]+$' | head -n 1)
+          if [ -z "$latest_tag" ]; then
+            next_tag="v1.0.0.1"
+          else
+            last_num=$(echo "$latest_tag" | awk -F. '{print $4}')
+            next_num=$((last_num + 1))
+            next_tag="v1.0.0.$next_num"
+          fi
+          echo "NEXT_TAG=$next_tag" >> $GITHUB_ENV
+          echo "Calculated next tag: $next_tag"
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Create .env file
+        run: |
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > streaming_mobile/.env
+          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> streaming_mobile/.env
+
+      - name: Build APK
+        run: |
+          cd streaming_mobile
+          flutter pub get
+          flutter build apk --release
+
+      - name: Prepare Release Asset
+        run: |
+          cp streaming_mobile/build/app/outputs/flutter-apk/app-release.apk streaming_mobile/build/app/outputs/flutter-apk/StreamVault.apk
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ env.NEXT_TAG }}
+          name: Release ${{ env.NEXT_TAG }}
+          files: streaming_mobile/build/app/outputs/flutter-apk/StreamVault.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
