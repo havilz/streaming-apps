@@ -52,7 +52,7 @@ We would like to thank TMDB (The Movie Database) for providing their comprehensi
     </td>
     <td align="left" valign="middle" style="border: none; padding-bottom: 15px;">
       <h3 style="margin: 0 0 4px 0; border: none; font-size: 1.4em;">havilz lating</h3>
-      <p style="margin: 0 0 12px 0; color: #8b949e; font-size: 0.95em;">Mobile Developer & StreamVault Creator</p>
+      <p style="margin: 0 0 12px 0; color: #8b949e; font-size: 0.95em;">StreamVault Creator</p>
       <a href="mailto:havilzlating05@gmail.com" style="text-decoration: none;">
         <img src="https://img.shields.io/badge/Email-D14836?style=flat-square&logo=gmail&logoColor=white" alt="Email" />
       </a>
