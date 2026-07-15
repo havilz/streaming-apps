@@ -3,3 +3,4 @@ export 'episode_tile.dart';
 export 'filter_bar.dart';
 export 'movie_card.dart';
 export 'season_selector.dart';
+export 'profile_badge.dart';

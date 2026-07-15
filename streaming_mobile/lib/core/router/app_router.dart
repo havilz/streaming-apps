@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:streaming_mobile/features/detail/data/episode_model.dart';
 import 'package:streaming_mobile/features/detail/presentation/detail_screen.dart';
@@ -15,6 +16,7 @@ import 'package:streaming_mobile/features/home/presentation/year_detail_screen.d
 import 'package:streaming_mobile/features/home/presentation/networks_screen.dart';
 import 'package:streaming_mobile/features/home/presentation/network_detail_screen.dart';
 import 'package:streaming_mobile/features/home/presentation/splash_screen.dart';
+import 'package:streaming_mobile/features/auth/presentation/auth_screen.dart';
 import 'package:streaming_mobile/shared/templates/main_scaffold.dart';
 
 final GoRouter appRouter = GoRouter(
@@ -111,6 +113,35 @@ final GoRouter appRouter = GoRouter(
     ),
 
     // Halaman tanpa bottom navbar
+    GoRoute(
+      path: '/auth',
+      name: 'auth',
+      pageBuilder: (context, state) {
+        return CustomTransitionPage<void>(
+          key: state.pageKey,
+          child: const AuthScreen(),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.0, 0.12),
+                  end: Offset.zero,
+                ).animate(
+                  CurvedAnimation(
+                    parent: animation,
+                    curve: Curves.easeOutCubic,
+                  ),
+                ),
+                child: child,
+              ),
+            );
+          },
+          transitionDuration: const Duration(milliseconds: 350),
+          reverseTransitionDuration: const Duration(milliseconds: 250),
+        );
+      },
+    ),
     GoRoute(
       path: '/detail/:slug',
       name: 'detail',

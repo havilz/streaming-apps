@@ -1,9 +1,12 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:streaming_mobile/core/core.dart';
+import 'package:streaming_mobile/shared/shared.dart';
+import 'package:streaming_mobile/features/auth/auth.dart';
 
-class MenuModal extends StatelessWidget {
+class MenuModal extends ConsumerWidget {
   const MenuModal({
     super.key,
     required this.onItemSelected,
@@ -25,7 +28,7 @@ class MenuModal extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final menuItems = [
       (label: 'Home', icon: Icons.home_rounded, value: 'home'),
       (label: 'Movie', icon: Icons.movie_rounded, value: 'movie'),
@@ -35,6 +38,18 @@ class MenuModal extends StatelessWidget {
       (label: 'Years', icon: Icons.calendar_today_rounded, value: 'years'),
       (label: 'Network', icon: Icons.cell_tower_rounded, value: 'network'),
     ];
+
+    final authState = ref.watch(authProvider);
+    String initials = '';
+    if (authState.isLoggedIn && authState.username != null) {
+      final name = authState.username!;
+      final parts = name.trim().split(RegExp(r'\s+'));
+      if (parts.length > 1) {
+        initials = (parts[0][0] + parts[1][0]).toUpperCase();
+      } else if (parts.isNotEmpty && parts[0].isNotEmpty) {
+        initials = parts[0][0].toUpperCase();
+      }
+    }
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -80,16 +95,39 @@ class MenuModal extends StatelessWidget {
 
                 const Spacer(flex: 1),
 
-                // Title
-                Text(
-                  'SV MENU',
-                  style: AppTypography.logo.copyWith(
-                    color: AppColors.primary,
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 3.0,
-                  ),
+                // Profile Badge & Status Section
+                ProfileBadge(
+                  initials: initials,
                 ),
+                const SizedBox(height: AppSpacing.sm),
+                // Status Text / Username Link (Flat text style)
+                if (authState.isLoggedIn)
+                  GestureDetector(
+                    onTap: () => _showLogoutDialog(context, ref),
+                    child: Text(
+                      '@${authState.username}',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  )
+                else
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.of(context).pop();
+                      context.push('/auth');
+                    },
+                    child: Text(
+                      'Sign In / Sign Up',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.w600,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: AppSpacing.xl),
 
                 // Menu items list
@@ -185,6 +223,53 @@ class MenuModal extends StatelessWidget {
       ),
     );
   }
+}
+
+void _showLogoutDialog(BuildContext context, WidgetRef ref) {
+  showDialog(
+    context: context,
+    builder: (context) => AlertDialog(
+      backgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadius.md),
+        side: const BorderSide(color: AppColors.borderSubtle),
+      ),
+      title: Text(
+        'Log Out',
+        style: AppTypography.heading.copyWith(color: AppColors.textPrimary),
+      ),
+      content: Text(
+        'Are you sure you want to log out of your account?',
+        style: AppTypography.body.copyWith(color: AppColors.textMuted),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text(
+            'Cancel',
+            style: TextStyle(color: AppColors.textMuted),
+          ),
+        ),
+        TextButton(
+          onPressed: () {
+            ref.read(authProvider.notifier).logout();
+            Navigator.of(context).pop(); // Tutup dialog
+            Navigator.of(context).pop(); // Tutup MenuModal
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Successfully logged out!'),
+                backgroundColor: AppColors.primary,
+              ),
+            );
+          },
+          child: const Text(
+            'Log Out',
+            style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ],
+    ),
+  );
 }
 
 void showMenuModal(BuildContext context, {required void Function(String item) onItemSelected}) {

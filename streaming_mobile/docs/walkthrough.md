@@ -1,4 +1,4 @@
-# Walkthrough Proyek Flutter (Project Walkthrough)
+# **Walkthrough Proyek Flutter (Project Walkthrough)**
 
 Dokumen ini akan diisi secara bertahap selama proses pengembangan berlangsung. Setiap checkpoint yang berhasil diselesaikan akan dicatat di sini beserta keputusan teknis, kendala yang ditemui, dan solusinya.
 
@@ -685,3 +685,40 @@ Mengimplementasikan alur **Otomatisasi CI/CD via GitHub Actions** dengan membuat
 **Hasil Akhir:**
 - Alur kerja CI/CD siap dijalankan secara aman dan otomatis di GitHub begitu branch `dev` di-merge ke branch `main`.
 - Rilis GitHub akan otomatis dibuat dengan tag berurutan `v1.0.0.X` secara berkala beserta lampiran APK produksinya.
+
+---
+
+## Checkpoint 43: Implementasi Autentikasi & Lencana Profil Dinamis (Frontend)
+
+Mengimplementasikan sistem Lencana Profil (Profile Badge) dinamis di menu modal samping dan menyediakan Halaman Autentikasi kustom bertema gelap premium bioskop.
+
+**Problem:**
+1. Sidebar menu modal menampilkan header teks statis `SV MENU` yang kurang fungsional.
+2. Aplikasi belum memiliki antarmuka pendaftaran (Sign Up) atau masuk (Sign In) bagi pengguna untuk mematangkan integrasi Supabase Auth.
+3. Struktur profil kustom statis sebelumnya terlalu kompleks karena hanya diperlukan lencana dengan inisial nama, nama pengguna `@username`, dan tautan login yang simpel dan efisien.
+
+**Solution:**
+1. **Molecule `ProfileBadge` Dinamis:**
+   - Membuat widget [profile_badge.dart](file:///c:/project/streaming-project/streaming_mobile/lib/shared/molecules/profile_badge.dart) yang secara cerdas mendeteksi status login pengguna.
+   - **Tamu (Guest):** Menampilkan ikon silhouette person default.
+   - **Login:** Menampilkan inisial huruf dari nama pengguna (contoh: "havilz lating" -> **HL**) dengan font Outfit tebal berbalut glow shadow merah StreamVault.
+2. **Pembaruan Header Menu Modal:**
+   - Mengubah [menu_modal.dart](file:///c:/project/streaming-project/streaming_mobile/lib/features/home/presentation/menu_modal.dart) menjadi `ConsumerWidget` untuk mengintegrasikan Riverpod state management.
+   - Di bawah `ProfileBadge`, jika belum login menampilkan tautan teks datar `Sign In / Sign Up` yang mengarahkan ke halaman Auth. Jika sudah login menampilkan `@username` yang jika diklik memicu dialog konfirmasi Log Out sinematik.
+3. **Modul Autentikasi (`features/auth`):**
+   - Membuat Riverpod Notifier [auth_provider.dart](file:///c:/project/streaming-project/streaming_mobile/lib/features/auth/domain/auth_provider.dart) untuk melacak state login pengguna secara real-time.
+   - Menyusun [auth_screen.dart](file:///c:/project/streaming-project/streaming_mobile/lib/features/auth/presentation/auth_screen.dart) berisi form formulir login/daftar (Username, Email/Phone, Password) dan simulasi Google OAuth.
+   - Menghapus folder `lib/features/profile/` lama secara permanen.
+4. **Penyelarasan Routing & Barrel:**
+   - Mendaftarkan rute `/auth` di [app_router.dart](file:///c:/project/streaming-project/streaming_mobile/lib/core/router/app_router.dart) di luar ShellRoute (layar mandiri premium) dengan konfigurasi `CustomTransitionPage` untuk menghadirkan animasi kombinasi slide-up (geser ke atas) & fade (memudar) secara halus selama 350ms saat masuk dan 250ms saat keluar.
+   - Mengekspor modul baru di global barrel [features.dart](file:///c:/project/streaming-project/streaming_mobile/lib/features/features.dart).
+
+**Status:** Selesai & Terverifikasi
+
+**Hasil Akhir:**
+- Menu modal samping sekarang secara dinamis merefleksikan status akun pengguna (ikon profil default tamu / inisial nama saat masuk).
+- Integrasi navigasi masuk/daftar dan konfirmasi keluar (Log Out) berjalan instan.
+- Seluruh rangkaian pengujian `flutter test` lulus sukses (All tests passed) dan static analysis `flutter analyze` bersih 100% bebas error.
+
+
+
